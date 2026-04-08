@@ -24,6 +24,12 @@ RUN npm install
 # Copy source code
 COPY . .
 
+# Ensure VITE_USE_BACKEND is written to .env so Vite's loadEnv picks it up
+# This is critical for the Supabase client alias to activate during build
+RUN echo "" >> .env && \
+    echo "VITE_USE_BACKEND=true" >> .env && \
+    echo "VITE_API_URL=/api" >> .env
+
 # Cache bust to force rebuild
 ARG CACHEBUST=1
 
