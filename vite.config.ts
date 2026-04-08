@@ -6,7 +6,8 @@ import { componentTagger } from "lovable-tagger";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  const useBackend = env.VITE_USE_BACKEND === 'true';
+  // Check both loadEnv (reads .env files) and process.env (Docker ENV)
+  const useBackend = env.VITE_USE_BACKEND === 'true' || process.env.VITE_USE_BACKEND === 'true';
 
   return {
     server: {
