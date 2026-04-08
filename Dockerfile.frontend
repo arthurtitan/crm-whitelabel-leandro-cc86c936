@@ -10,12 +10,14 @@ WORKDIR /app
 # Accept build arguments
 ARG VITE_API_URL=/api
 ARG VITE_USE_BACKEND=true
+ARG VITE_SUPABASE_URL=https://hdiwzuesrfgefztqrqbm.supabase.co
+ARG VITE_SUPABASE_PUBLISHABLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhkaXd6dWVzcmZnZWZ6dHFycWJtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzOTA2NTgsImV4cCI6MjA4OTk2NjY1OH0.XIoqM8gzZqgQp6-01uLlfZFroJyOBf8p3YCQ2JxAW_4
 
-# Set as environment variables for the build (only non-empty values)
-# VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY come from .env.production
-# which is committed to git and copied into the container via COPY . .
+# Set as environment variables for the build
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_USE_BACKEND=$VITE_USE_BACKEND
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
+ENV VITE_SUPABASE_PUBLISHABLE_KEY=$VITE_SUPABASE_PUBLISHABLE_KEY
 
 # Copy package files
 COPY package*.json ./
