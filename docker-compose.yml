@@ -66,11 +66,11 @@ services:
       RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-100}
       CHATWOOT_WEBHOOK_SECRET: ${CHATWOOT_WEBHOOK_SECRET:-}
       RAPIDAPI_KEY: ${RAPIDAPI_KEY:-135d71789fmsh285761fddf395b1p1eb3e3jsn35a4433e1377}
-      GOOGLE_CLIENT_ID: "139951706457-1qgvvuqrokb2rv5bvofnscdgnhhf12o2.apps.googleusercontent.com"
-      GOOGLE_CLIENT_SECRET: "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"
-      GOOGLE_REDIRECT_URI: "https://goodleads.mychooice.com/api/calendar/google/callback"
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-231653132408-iv5b27dlf72ekmbvmviuevcruc6kqs8m.apps.googleusercontent.com}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-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}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-https://goodleads.mychooice.com/api/calendar/google/callback}
       LOG_LEVEL: ${LOG_LEVEL:-info}
-      BUILD_VERSION: "2026-04-07-google-calendar-hardcode-fix"
+      BUILD_VERSION: "2026-04-08-fix-white-screen-and-google"
       RUN_SEED: ${RUN_SEED:-true}
     expose:
       - "3000"
