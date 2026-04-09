@@ -20,6 +20,8 @@ export type Database = {
           chatwoot_api_key: string | null
           chatwoot_base_url: string | null
           created_at: string | null
+          email_batch_size: number | null
+          email_delay_ms: number | null
           google_client_id: string | null
           google_client_secret: string | null
           google_redirect_uri: string | null
@@ -41,6 +43,8 @@ export type Database = {
           chatwoot_api_key?: string | null
           chatwoot_base_url?: string | null
           created_at?: string | null
+          email_batch_size?: number | null
+          email_delay_ms?: number | null
           google_client_id?: string | null
           google_client_secret?: string | null
           google_redirect_uri?: string | null
@@ -62,6 +66,8 @@ export type Database = {
           chatwoot_api_key?: string | null
           chatwoot_base_url?: string | null
           created_at?: string | null
+          email_batch_size?: number | null
+          email_delay_ms?: number | null
           google_client_id?: string | null
           google_client_secret?: string | null
           google_redirect_uri?: string | null
@@ -342,6 +348,54 @@ export type Database = {
             columns: ["batch_id"]
             isOneToOne: false
             referencedRelation: "dispatch_batches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_cadence_rules: {
+        Row: {
+          active: boolean
+          cadence_id: string
+          created_at: string
+          delay_hours: number
+          id: string
+          target_cadence_id: string
+          trigger_event: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          cadence_id: string
+          created_at?: string
+          delay_hours?: number
+          id?: string
+          target_cadence_id: string
+          trigger_event: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          cadence_id?: string
+          created_at?: string
+          delay_hours?: number
+          id?: string
+          target_cadence_id?: string
+          trigger_event?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_cadence_rules_cadence_id_fkey"
+            columns: ["cadence_id"]
+            isOneToOne: false
+            referencedRelation: "email_cadences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_cadence_rules_target_cadence_id_fkey"
+            columns: ["target_cadence_id"]
+            isOneToOne: false
+            referencedRelation: "email_cadences"
             referencedColumns: ["id"]
           },
         ]
