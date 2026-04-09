@@ -21,6 +21,18 @@ export interface EmailCadenceStep {
   updated_at: string;
 }
 
+export interface EmailCadenceRule {
+  id: string;
+  cadence_id: string;
+  trigger_event: 'opened' | 'clicked' | 'replied' | 'not_opened' | 'bounced';
+  target_cadence_id: string;
+  delay_hours: number;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+  target_cadence?: { id: string; name: string };
+}
+
 export interface EmailCadence {
   id: string;
   account_id: string;
@@ -32,6 +44,7 @@ export interface EmailCadence {
   created_at: string;
   updated_at: string;
   steps?: EmailCadenceStep[];
+  rules?: EmailCadenceRule[];
 }
 
 export interface EmailTemplate {
@@ -107,6 +120,21 @@ function mapCadence(c: any): EmailCadence {
     created_at: c.created_at ?? c.createdAt,
     updated_at: c.updated_at ?? c.updatedAt,
     steps: (c.steps || []).map(mapStep),
+    rules: (c.rulesFrom || c.rules || []).map(mapRule),
+  };
+}
+
+function mapRule(r: any): EmailCadenceRule {
+  return {
+    id: r.id,
+    cadence_id: r.cadence_id ?? r.cadenceId,
+    trigger_event: r.trigger_event ?? r.triggerEvent,
+    target_cadence_id: r.target_cadence_id ?? r.targetCadenceId,
+    delay_hours: r.delay_hours ?? r.delayHours ?? 0,
+    active: r.active ?? true,
+    created_at: r.created_at ?? r.createdAt,
+    updated_at: r.updated_at ?? r.updatedAt,
+    target_cadence: r.target_cadence ?? r.targetCadence,
   };
 }
 
@@ -289,5 +317,25 @@ export const emailApiService = {
   async testOpenai(apiKey: string): Promise<{ success: boolean; message: string }> {
     const res = await apiClient.post<any>(API_ENDPOINTS.EMAIL.TEST_OPENAI, { apiKey });
     return unwrap(res);
+  },
+
+  // Cadence Rules
+  async listRules(cadenceId: string): Promise<EmailCadenceRule[]> {
+    const res = await apiClient.get<any>(API_ENDPOINTS.EMAIL.CADENCE_RULES(cadenceId));
+    return (unwrap<any[]>(res) || []).map(mapRule);
+  },
+
+  async createRule(cadenceId: string, data: { triggerEvent: string; targetCadenceId: string; delayHours?: number }): Promise<EmailCadenceRule> {
+    const res = await apiClient.post<any>(API_ENDPOINTS.EMAIL.CADENCE_RULES(cadenceId), data);
+    return mapRule(unwrap(res));
+  },
+
+  async updateRule(id: string, data: Partial<{ triggerEvent: string; targetCadenceId: string; delayHours: number; active: boolean }>): Promise<EmailCadenceRule> {
+    const res = await apiClient.put<any>(API_ENDPOINTS.EMAIL.RULE(id), data);
+    return mapRule(unwrap(res));
+  },
+
+  async deleteRule(id: string): Promise<void> {
+    await apiClient.delete(API_ENDPOINTS.EMAIL.RULE(id));
   },
 };

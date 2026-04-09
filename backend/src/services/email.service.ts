@@ -4,13 +4,39 @@ import { logger } from '../utils/logger';
 
 const prisma = new PrismaClient();
 
+// Utility: delay
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Utility: exponential backoff
+async function withBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries = 3,
+  baseDelayMs = 1000
+): Promise<T> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      const is429 = error?.status === 429 || error?.message?.includes('429');
+      if (!is429 || attempt === maxRetries) throw error;
+      const waitMs = baseDelayMs * Math.pow(2, attempt);
+      logger.warn(`[EmailProcessor] Rate limited (429), retrying in ${waitMs}ms (attempt ${attempt + 1}/${maxRetries})`);
+      await delay(waitMs);
+    }
+  }
+  throw new Error('Unreachable');
+}
+
 export const emailService = {
   // ==================== CADENCES ====================
 
   async listCadences(accountId: string) {
     return prisma.emailCadence.findMany({
       where: { accountId },
-      include: { steps: { orderBy: { ordem: 'asc' } } },
+      include: {
+        steps: { orderBy: { ordem: 'asc' } },
+        rulesFrom: { include: { targetCadence: { select: { id: true, name: true } } } },
+      },
       orderBy: { createdAt: 'desc' },
     });
   },
@@ -21,6 +47,7 @@ export const emailService = {
       include: {
         steps: { orderBy: { ordem: 'asc' } },
         enrollments: { include: { contact: true } },
+        rulesFrom: { include: { targetCadence: { select: { id: true, name: true } } } },
       },
     });
   },
@@ -59,6 +86,50 @@ export const emailService = {
 
   async deleteCadence(id: string, accountId: string) {
     return prisma.emailCadence.delete({ where: { id } });
+  },
+
+  // ==================== CADENCE RULES ====================
+
+  async listRules(cadenceId: string) {
+    return prisma.emailCadenceRule.findMany({
+      where: { cadenceId },
+      include: { targetCadence: { select: { id: true, name: true } } },
+      orderBy: { createdAt: 'asc' },
+    });
+  },
+
+  async createRule(data: {
+    cadenceId: string;
+    triggerEvent: string;
+    targetCadenceId: string;
+    delayHours?: number;
+  }) {
+    return prisma.emailCadenceRule.create({
+      data: {
+        cadenceId: data.cadenceId,
+        triggerEvent: data.triggerEvent,
+        targetCadenceId: data.targetCadenceId,
+        delayHours: data.delayHours || 0,
+      },
+      include: { targetCadence: { select: { id: true, name: true } } },
+    });
+  },
+
+  async updateRule(id: string, data: {
+    triggerEvent?: string;
+    targetCadenceId?: string;
+    delayHours?: number;
+    active?: boolean;
+  }) {
+    return prisma.emailCadenceRule.update({
+      where: { id },
+      data,
+      include: { targetCadence: { select: { id: true, name: true } } },
+    });
+  },
+
+  async deleteRule(id: string) {
+    return prisma.emailCadenceRule.delete({ where: { id } });
   },
 
   // ==================== STEPS ====================
@@ -154,7 +225,6 @@ export const emailService = {
 
     const enrollments = await Promise.all(
       data.contactIds.map(async (contactId) => {
-        // Check if already enrolled
         const existing = await prisma.emailEnrollment.findFirst({
           where: {
             cadenceId: data.cadenceId,
@@ -239,7 +309,7 @@ export const emailService = {
     return { total, sent, delivered, opened, clicked, bounced, failed };
   },
 
-  // ==================== CADENCE PROCESSOR ====================
+  // ==================== CADENCE PROCESSOR (with rate limiting) ====================
 
   async processCadenceQueue() {
     const now = new Date();
@@ -251,109 +321,234 @@ export const emailService = {
         nextSendAt: { lte: now },
       },
       include: {
-        cadence: { include: { steps: { orderBy: { ordem: 'asc' } } } },
+        cadence: {
+          include: {
+            steps: { orderBy: { ordem: 'asc' } },
+            rulesFrom: { where: { active: true } },
+          },
+        },
         contact: true,
       },
-      take: 50,
+      take: 100, // Global batch limit
     });
 
     logger.info(`[EmailProcessor] Found ${readyEnrollments.length} enrollments to process`);
 
+    // Group by account for rate limiting
+    const byAccount = new Map<string, typeof readyEnrollments>();
     for (const enrollment of readyEnrollments) {
-      try {
-        const steps = enrollment.cadence.steps.filter(s => s.active);
-        const currentStep = steps[enrollment.currentStep];
+      const list = byAccount.get(enrollment.accountId) || [];
+      list.push(enrollment);
+      byAccount.set(enrollment.accountId, list);
+    }
 
-        if (!currentStep || !enrollment.contact.email) {
-          // No more steps or no email → mark as completed
-          await prisma.emailEnrollment.update({
-            where: { id: enrollment.id },
-            data: { status: 'completed', completedAt: now },
-          });
-          continue;
-        }
+    let totalProcessed = 0;
 
-        // Get SendGrid credentials
-        const creds = await sendgridService.getAccountCredentials(enrollment.accountId);
-        if (!creds) {
-          logger.warn(`[EmailProcessor] No SendGrid credentials for account ${enrollment.accountId}`);
-          continue;
-        }
+    for (const [accountId, enrollments] of byAccount) {
+      // Get account-specific rate limit config
+      const account = await prisma.account.findUnique({
+        where: { id: accountId },
+        select: {
+          emailBatchSize: true,
+          emailDelayMs: true,
+          sendgridApiKey: true,
+          sendgridFromEmail: true,
+          sendgridFromName: true,
+        },
+      });
 
-        // Replace variables in subject/body
-        const replacements: Record<string, string> = {
-          '{nome}': enrollment.contact.nome || '',
-          '{email}': enrollment.contact.email || '',
-        };
+      if (!account?.sendgridApiKey || !account?.sendgridFromEmail) {
+        logger.warn(`[EmailProcessor] No SendGrid credentials for account ${accountId}`);
+        continue;
+      }
 
-        let subject = currentStep.subject;
-        let bodyHtml = currentStep.bodyHtml;
-        for (const [key, val] of Object.entries(replacements)) {
-          subject = subject.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), val);
-          bodyHtml = bodyHtml.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), val);
-        }
+      const batchSize = account.emailBatchSize || 100;
+      const delayMs = account.emailDelayMs || 500;
+      const creds = {
+        apiKey: account.sendgridApiKey,
+        fromEmail: account.sendgridFromEmail,
+        fromName: account.sendgridFromName || 'GoodLeads CRM',
+      };
 
-        // Create send record
-        const emailSend = await prisma.emailSend.create({
-          data: {
-            accountId: enrollment.accountId,
-            enrollmentId: enrollment.id,
-            stepId: currentStep.id,
-            contactId: enrollment.contactId,
-            toEmail: enrollment.contact.email,
-            subject,
-            status: 'queued',
-          },
-        });
+      const batch = enrollments.slice(0, batchSize);
 
-        // Send via SendGrid
-        const result = await sendgridService.sendEmail({
-          to: enrollment.contact.email,
-          subject,
-          html: bodyHtml,
-          text: currentStep.bodyText || undefined,
-          fromEmail: creds.fromEmail,
-          fromName: creds.fromName,
-          apiKey: creds.apiKey,
-        });
+      for (const enrollment of batch) {
+        try {
+          const steps = enrollment.cadence.steps.filter(s => s.active);
+          const currentStep = steps[enrollment.currentStep];
 
-        if (result.success) {
-          await prisma.emailSend.update({
-            where: { id: emailSend.id },
-            data: {
-              status: 'sent',
-              sentAt: now,
-              sendgridMessageId: result.messageId,
-            },
-          });
-
-          // Advance to next step
-          const nextStepIndex = enrollment.currentStep + 1;
-          const nextStep = steps[nextStepIndex];
-
-          if (nextStep) {
-            const nextSendAt = new Date(now.getTime() + nextStep.dayNumber * 24 * 60 * 60 * 1000);
-            await prisma.emailEnrollment.update({
-              where: { id: enrollment.id },
-              data: { currentStep: nextStepIndex, nextSendAt },
-            });
-          } else {
+          if (!currentStep || !enrollment.contact.email) {
             await prisma.emailEnrollment.update({
               where: { id: enrollment.id },
               data: { status: 'completed', completedAt: now },
             });
+            continue;
           }
-        } else {
-          await prisma.emailSend.update({
-            where: { id: emailSend.id },
-            data: { status: 'failed', errorMessage: result.error },
+
+          // Replace variables
+          const replacements: Record<string, string> = {
+            '{nome}': enrollment.contact.nome || '',
+            '{email}': enrollment.contact.email || '',
+          };
+
+          let subject = currentStep.subject;
+          let bodyHtml = currentStep.bodyHtml;
+          for (const [key, val] of Object.entries(replacements)) {
+            subject = subject.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), val);
+            bodyHtml = bodyHtml.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), val);
+          }
+
+          // Create send record
+          const emailSend = await prisma.emailSend.create({
+            data: {
+              accountId: enrollment.accountId,
+              enrollmentId: enrollment.id,
+              stepId: currentStep.id,
+              contactId: enrollment.contactId,
+              toEmail: enrollment.contact.email,
+              subject,
+              status: 'queued',
+            },
           });
+
+          // Send with exponential backoff on 429
+          const result = await withBackoff(() =>
+            sendgridService.sendEmail({
+              to: enrollment.contact.email!,
+              subject,
+              html: bodyHtml,
+              text: currentStep.bodyText || undefined,
+              fromEmail: creds.fromEmail,
+              fromName: creds.fromName,
+              apiKey: creds.apiKey,
+            })
+          );
+
+          if (result.success) {
+            await prisma.emailSend.update({
+              where: { id: emailSend.id },
+              data: {
+                status: 'sent',
+                sentAt: now,
+                sendgridMessageId: result.messageId,
+              },
+            });
+
+            // Advance to next step
+            const nextStepIndex = enrollment.currentStep + 1;
+            const nextStep = steps[nextStepIndex];
+
+            if (nextStep) {
+              const nextSendAt = new Date(now.getTime() + nextStep.dayNumber * 24 * 60 * 60 * 1000);
+              await prisma.emailEnrollment.update({
+                where: { id: enrollment.id },
+                data: { currentStep: nextStepIndex, nextSendAt },
+              });
+            } else {
+              await prisma.emailEnrollment.update({
+                where: { id: enrollment.id },
+                data: { status: 'completed', completedAt: now },
+              });
+            }
+
+            totalProcessed++;
+          } else {
+            await prisma.emailSend.update({
+              where: { id: emailSend.id },
+              data: { status: 'failed', errorMessage: result.error },
+            });
+          }
+
+          // Rate limit delay between sends
+          await delay(delayMs);
+        } catch (error: any) {
+          logger.error(`[EmailProcessor] Error processing enrollment ${enrollment.id}: ${error.message}`);
         }
-      } catch (error: any) {
-        logger.error(`[EmailProcessor] Error processing enrollment ${enrollment.id}: ${error.message}`);
       }
     }
 
-    return readyEnrollments.length;
+    // Process branching rules based on webhook events
+    await this.processBranchingRules();
+
+    return totalProcessed;
+  },
+
+  // ==================== BRANCHING RULES PROCESSOR ====================
+
+  async processBranchingRules() {
+    try {
+      // Find recently completed/updated sends with events
+      const recentSends = await prisma.emailSend.findMany({
+        where: {
+          OR: [
+            { status: 'opened', openedAt: { gte: new Date(Date.now() - 10 * 60 * 1000) } },
+            { status: 'clicked', clickedAt: { gte: new Date(Date.now() - 10 * 60 * 1000) } },
+            { status: 'bounced', bouncedAt: { gte: new Date(Date.now() - 10 * 60 * 1000) } },
+          ],
+          enrollmentId: { not: null },
+        },
+        include: {
+          enrollment: {
+            include: {
+              cadence: {
+                include: { rulesFrom: { where: { active: true } } },
+              },
+            },
+          },
+        },
+        take: 100,
+      });
+
+      for (const send of recentSends) {
+        if (!send.enrollment?.cadence?.rulesFrom?.length) continue;
+
+        // Map send status to trigger event
+        let triggerEvent: string | null = null;
+        if (send.status === 'clicked') triggerEvent = 'clicked';
+        else if (send.status === 'opened') triggerEvent = 'opened';
+        else if (send.status === 'bounced') triggerEvent = 'bounced';
+
+        if (!triggerEvent) continue;
+
+        // Find matching rule (priority: clicked > opened > bounced)
+        const matchingRule = send.enrollment.cadence.rulesFrom.find(
+          r => r.triggerEvent === triggerEvent
+        );
+
+        if (!matchingRule) continue;
+
+        // Check if already enrolled in target cadence
+        const existingEnrollment = await prisma.emailEnrollment.findFirst({
+          where: {
+            cadenceId: matchingRule.targetCadenceId,
+            contactId: send.enrollment.contactId,
+            status: 'active',
+          },
+        });
+
+        if (existingEnrollment) continue;
+
+        // Complete current enrollment
+        await prisma.emailEnrollment.update({
+          where: { id: send.enrollmentId! },
+          data: { status: 'completed', completedAt: new Date() },
+        });
+
+        // Create new enrollment in target cadence
+        const delayMs = matchingRule.delayHours * 60 * 60 * 1000;
+        await prisma.emailEnrollment.create({
+          data: {
+            accountId: send.accountId,
+            cadenceId: matchingRule.targetCadenceId,
+            contactId: send.enrollment.contactId,
+            nextSendAt: new Date(Date.now() + delayMs),
+          },
+        });
+
+        logger.info(`[Branching] Contact ${send.enrollment.contactId} moved to cadence ${matchingRule.targetCadenceId} (trigger: ${triggerEvent})`);
+      }
+    } catch (error: any) {
+      logger.error(`[Branching] Error processing rules: ${error.message}`);
+    }
   },
 };

@@ -10,16 +10,22 @@ import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import {
   Mail, Plus, Send, Eye, MousePointer, AlertTriangle, Clock, Sparkles,
-  Edit2, Trash2, MoreHorizontal, RefreshCw, Loader2, ChevronRight
+  Edit2, Trash2, MoreHorizontal, RefreshCw, Loader2, ChevronRight,
+  GitBranch, Zap
 } from 'lucide-react';
 import EmailSettingsPanel from '@/components/email/EmailSettingsPanel';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   emailApiService,
   type EmailCadence,
   type EmailCadenceStep,
+  type EmailCadenceRule,
   type SendStats,
   type GeneratedEmail,
   type EmailSend,
@@ -49,8 +55,13 @@ export default function AdminEmailsPage() {
   // Dialogs
   const [showCadenceDialog, setShowCadenceDialog] = useState(false);
   const [showStepDialog, setShowStepDialog] = useState(false);
+  const [showRuleDialog, setShowRuleDialog] = useState(false);
+  const [showEnrollConfirm, setShowEnrollConfirm] = useState(false);
   const [editingCadence, setEditingCadence] = useState<EmailCadence | null>(null);
   const [editingStep, setEditingStep] = useState<EmailCadenceStep | null>(null);
+
+  // Rules
+  const [ruleForm, setRuleForm] = useState({ triggerEvent: 'opened', targetCadenceId: '', delayHours: 0 });
 
   // AI Assistant
   const [aiPrompt, setAiPrompt] = useState('');
@@ -221,7 +232,7 @@ export default function AdminEmailsPage() {
     toast.info('Texto aplicado ao formulário de step!');
   };
 
-  // ==================== ENROLL ====================
+  // ==================== ENROLL (with confirmation) ====================
   const handleEnrollStageContacts = async () => {
     if (!selectedCadence || !selectedStage) return;
     const contactIds = selectedStage.contacts.filter(c => c.email).map(c => c.id);
@@ -229,15 +240,57 @@ export default function AdminEmailsPage() {
       toast.warning('Nenhum contato com e-mail nesta etapa.');
       return;
     }
+    setShowEnrollConfirm(true);
+  };
+
+  const confirmEnroll = async () => {
+    if (!selectedCadence || !selectedStage) return;
+    const contactIds = selectedStage.contacts.filter(c => c.email).map(c => c.id);
+    setShowEnrollConfirm(false);
     try {
       await emailApiService.enroll(selectedCadence.id, contactIds);
-      toast.success(`${contactIds.length} contato(s) inscritos na cadência!`);
+      toast.success(`${contactIds.length} contato(s) inscritos na cadência "${selectedCadence.name}"!`);
     } catch (err: any) {
       toast.error(err?.message || 'Erro ao inscrever contatos');
     }
   };
 
-  // ==================== RENDER ====================
+  // ==================== RULES ====================
+  const handleSaveRule = async () => {
+    if (!selectedCadence || !ruleForm.targetCadenceId) return;
+    try {
+      await emailApiService.createRule(selectedCadence.id, ruleForm);
+      toast.success('Regra de ramificação criada!');
+      setShowRuleDialog(false);
+      setRuleForm({ triggerEvent: 'opened', targetCadenceId: '', delayHours: 0 });
+      const updated = await emailApiService.getCadence(selectedCadence.id);
+      setSelectedCadence(updated);
+      setCadences(prev => prev.map(c => c.id === updated.id ? updated : c));
+    } catch (err: any) {
+      toast.error(err?.message || 'Erro ao criar regra');
+    }
+  };
+
+  const handleDeleteRule = async (ruleId: string) => {
+    if (!selectedCadence) return;
+    try {
+      await emailApiService.deleteRule(ruleId);
+      toast.success('Regra excluída!');
+      const updated = await emailApiService.getCadence(selectedCadence.id);
+      setSelectedCadence(updated);
+      setCadences(prev => prev.map(c => c.id === updated.id ? updated : c));
+    } catch (err: any) {
+      toast.error(err?.message || 'Erro ao excluir regra');
+    }
+  };
+
+  const triggerEventLabels: Record<string, string> = {
+    opened: '📬 Abriu o e-mail',
+    clicked: '🖱️ Clicou no link',
+    replied: '💬 Respondeu',
+    not_opened: '🚫 Não abriu',
+    bounced: '⚠️ Bounce',
+  };
 
   const kpis = [
     { label: 'Enviados', value: stats.sent + stats.delivered, icon: Send, color: 'text-blue-400' },
@@ -403,6 +456,62 @@ export default function AdminEmailsPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Branching Rules Section */}
+          {selectedCadence && (
+            <Card className="card-gradient border-border/50">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <GitBranch className="w-5 h-5" />
+                    Regras de Ramificação
+                  </CardTitle>
+                  <Button variant="ghost" size="sm" onClick={() => {
+                    setRuleForm({ triggerEvent: 'opened', targetCadenceId: '', delayHours: 0 });
+                    setShowRuleDialog(true);
+                  }}>
+                    <Plus className="w-4 h-4 mr-1" /> Nova Regra
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Mova leads automaticamente para outras cadências com base em ações
+                </p>
+              </CardHeader>
+              <CardContent>
+                {(selectedCadence.rules || []).length === 0 ? (
+                  <div className="text-center py-4 text-muted-foreground">
+                    <Zap className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">Nenhuma regra configurada</p>
+                    <p className="text-xs mt-1">Crie regras para automação inteligente</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {(selectedCadence.rules || []).map(rule => (
+                      <div key={rule.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/50">
+                        <div className="flex items-center gap-3">
+                          <Badge variant="outline" className="text-xs">
+                            {triggerEventLabels[rule.trigger_event] || rule.trigger_event}
+                          </Badge>
+                          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-sm font-medium">
+                            {rule.target_cadence?.name || 'Cadência'}
+                          </span>
+                          {rule.delay_hours > 0 && (
+                            <Badge variant="secondary" className="text-[10px]">
+                              +{rule.delay_hours}h
+                            </Badge>
+                          )}
+                        </div>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleDeleteRule(rule.id)}>
+                          <Trash2 className="w-3 h-3 text-destructive" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Funnel Section */}
           <Card className="card-gradient border-border/50">
@@ -675,6 +784,91 @@ export default function AdminEmailsPage() {
             <Button variant="outline" onClick={() => setShowStepDialog(false)}>Cancelar</Button>
             <Button onClick={handleSaveStep} disabled={!stepForm.subject.trim() || !stepForm.bodyHtml.trim()}>
               {editingStep ? 'Salvar' : 'Criar Step'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Enrollment Confirmation Dialog */}
+      <AlertDialog open={showEnrollConfirm} onOpenChange={setShowEnrollConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar inscrição na cadência</AlertDialogTitle>
+            <AlertDialogDescription>
+              Você está prestes a inscrever{' '}
+              <strong>{selectedStage?.contacts.filter(c => c.email).length || 0} contato(s)</strong>{' '}
+              com e-mail da etapa <strong>"{selectedStage?.name}"</strong> na cadência{' '}
+              <strong>"{selectedCadence?.name}"</strong>.
+              <br /><br />
+              Os e-mails serão disparados automaticamente de acordo com a programação da cadência.
+              Deseja continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmEnroll}>
+              Confirmar e Inscrever
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Rule Dialog */}
+      <Dialog open={showRuleDialog} onOpenChange={setShowRuleDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nova Regra de Ramificação</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Quando o lead...</label>
+              <Select
+                value={ruleForm.triggerEvent}
+                onValueChange={(v) => setRuleForm(prev => ({ ...prev, triggerEvent: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="opened">📬 Abrir o e-mail</SelectItem>
+                  <SelectItem value="clicked">🖱️ Clicar no link</SelectItem>
+                  <SelectItem value="replied">💬 Responder</SelectItem>
+                  <SelectItem value="not_opened">🚫 Não abrir</SelectItem>
+                  <SelectItem value="bounced">⚠️ Bounce</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Mover para cadência:</label>
+              <Select
+                value={ruleForm.targetCadenceId}
+                onValueChange={(v) => setRuleForm(prev => ({ ...prev, targetCadenceId: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione uma cadência" />
+                </SelectTrigger>
+                <SelectContent>
+                  {cadences.filter(c => c.id !== selectedCadence?.id).map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Aguardar (horas) antes de mover</label>
+              <Input
+                type="number"
+                min={0}
+                value={ruleForm.delayHours}
+                onChange={(e) => setRuleForm(prev => ({ ...prev, delayHours: parseInt(e.target.value) || 0 }))}
+              />
+              <p className="text-xs text-muted-foreground mt-1">0 = mover imediatamente</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRuleDialog(false)}>Cancelar</Button>
+            <Button onClick={handleSaveRule} disabled={!ruleForm.targetCadenceId}>
+              Criar Regra
             </Button>
           </DialogFooter>
         </DialogContent>

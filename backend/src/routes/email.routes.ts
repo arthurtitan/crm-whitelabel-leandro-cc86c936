@@ -49,6 +49,12 @@ router.put('/settings', requirePermission('emails'), (req, res, next) => emailCo
 // Processor
 router.post('/process', requirePermission('emails'), (req, res, next) => emailController.processQueue(req, res, next));
 
+// Cadence Rules (branching)
+router.get('/cadences/:id/rules', requirePermission('emails'), (req, res, next) => emailController.listRules(req, res, next));
+router.post('/cadences/:id/rules', requirePermission('emails'), (req, res, next) => emailController.createRule(req, res, next));
+router.put('/rules/:id', requirePermission('emails'), (req, res, next) => emailController.updateRule(req, res, next));
+router.delete('/rules/:id', requirePermission('emails'), (req, res, next) => emailController.deleteRule(req, res, next));
+
 // Connection tests
 router.post('/test-connection', requirePermission('emails'), (req, res, next) => emailController.testSendgrid(req, res, next));
 router.post('/test-send', requirePermission('emails'), (req, res, next) => emailController.testSendEmail(req, res, next));
