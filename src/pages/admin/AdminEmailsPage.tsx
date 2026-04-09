@@ -12,6 +12,7 @@ import {
   Mail, Plus, Send, Eye, MousePointer, AlertTriangle, Clock, Sparkles,
   Edit2, Trash2, MoreHorizontal, RefreshCw, Loader2, ChevronRight
 } from 'lucide-react';
+import EmailSettingsPanel from '@/components/email/EmailSettingsPanel';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
@@ -595,6 +596,9 @@ export default function AdminEmailsPage() {
           </Card>
         </div>
       </div>
+
+      {/* Settings Panel */}
+      <EmailSettingsPanel />
 
       {/* ==================== DIALOGS ==================== */}
 
