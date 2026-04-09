@@ -120,6 +120,21 @@ function mapCadence(c: any): EmailCadence {
     created_at: c.created_at ?? c.createdAt,
     updated_at: c.updated_at ?? c.updatedAt,
     steps: (c.steps || []).map(mapStep),
+    rules: (c.rulesFrom || c.rules || []).map(mapRule),
+  };
+}
+
+function mapRule(r: any): EmailCadenceRule {
+  return {
+    id: r.id,
+    cadence_id: r.cadence_id ?? r.cadenceId,
+    trigger_event: r.trigger_event ?? r.triggerEvent,
+    target_cadence_id: r.target_cadence_id ?? r.targetCadenceId,
+    delay_hours: r.delay_hours ?? r.delayHours ?? 0,
+    active: r.active ?? true,
+    created_at: r.created_at ?? r.createdAt,
+    updated_at: r.updated_at ?? r.updatedAt,
+    target_cadence: r.target_cadence ?? r.targetCadence,
   };
 }
 
