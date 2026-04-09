@@ -155,6 +155,8 @@ export default function SuperAdminUsersPage() {
     { id: 'products', label: 'Produtos', icon: Package },
     { id: 'events', label: 'Eventos', icon: Activity },
     { id: 'insights', label: 'Insights', icon: Lightbulb },
+    { id: 'extracao', label: 'Prospecção', icon: Crosshair },
+    { id: 'emails', label: 'E-mails', icon: Mail },
   ];
 
   // Special action permissions
