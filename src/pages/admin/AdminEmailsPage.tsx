@@ -232,7 +232,7 @@ export default function AdminEmailsPage() {
     toast.info('Texto aplicado ao formulário de step!');
   };
 
-  // ==================== ENROLL ====================
+  // ==================== ENROLL (with confirmation) ====================
   const handleEnrollStageContacts = async () => {
     if (!selectedCadence || !selectedStage) return;
     const contactIds = selectedStage.contacts.filter(c => c.email).map(c => c.id);
@@ -240,15 +240,57 @@ export default function AdminEmailsPage() {
       toast.warning('Nenhum contato com e-mail nesta etapa.');
       return;
     }
+    setShowEnrollConfirm(true);
+  };
+
+  const confirmEnroll = async () => {
+    if (!selectedCadence || !selectedStage) return;
+    const contactIds = selectedStage.contacts.filter(c => c.email).map(c => c.id);
+    setShowEnrollConfirm(false);
     try {
       await emailApiService.enroll(selectedCadence.id, contactIds);
-      toast.success(`${contactIds.length} contato(s) inscritos na cadência!`);
+      toast.success(`${contactIds.length} contato(s) inscritos na cadência "${selectedCadence.name}"!`);
     } catch (err: any) {
       toast.error(err?.message || 'Erro ao inscrever contatos');
     }
   };
 
-  // ==================== RENDER ====================
+  // ==================== RULES ====================
+  const handleSaveRule = async () => {
+    if (!selectedCadence || !ruleForm.targetCadenceId) return;
+    try {
+      await emailApiService.createRule(selectedCadence.id, ruleForm);
+      toast.success('Regra de ramificação criada!');
+      setShowRuleDialog(false);
+      setRuleForm({ triggerEvent: 'opened', targetCadenceId: '', delayHours: 0 });
+      const updated = await emailApiService.getCadence(selectedCadence.id);
+      setSelectedCadence(updated);
+      setCadences(prev => prev.map(c => c.id === updated.id ? updated : c));
+    } catch (err: any) {
+      toast.error(err?.message || 'Erro ao criar regra');
+    }
+  };
+
+  const handleDeleteRule = async (ruleId: string) => {
+    if (!selectedCadence) return;
+    try {
+      await emailApiService.deleteRule(ruleId);
+      toast.success('Regra excluída!');
+      const updated = await emailApiService.getCadence(selectedCadence.id);
+      setSelectedCadence(updated);
+      setCadences(prev => prev.map(c => c.id === updated.id ? updated : c));
+    } catch (err: any) {
+      toast.error(err?.message || 'Erro ao excluir regra');
+    }
+  };
+
+  const triggerEventLabels: Record<string, string> = {
+    opened: '📬 Abriu o e-mail',
+    clicked: '🖱️ Clicou no link',
+    replied: '💬 Respondeu',
+    not_opened: '🚫 Não abriu',
+    bounced: '⚠️ Bounce',
+  };
 
   const kpis = [
     { label: 'Enviados', value: stats.sent + stats.delivered, icon: Send, color: 'text-blue-400' },
