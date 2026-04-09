@@ -457,6 +457,62 @@ export default function AdminEmailsPage() {
             </CardContent>
           </Card>
 
+          {/* Branching Rules Section */}
+          {selectedCadence && (
+            <Card className="card-gradient border-border/50">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <GitBranch className="w-5 h-5" />
+                    Regras de Ramificação
+                  </CardTitle>
+                  <Button variant="ghost" size="sm" onClick={() => {
+                    setRuleForm({ triggerEvent: 'opened', targetCadenceId: '', delayHours: 0 });
+                    setShowRuleDialog(true);
+                  }}>
+                    <Plus className="w-4 h-4 mr-1" /> Nova Regra
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Mova leads automaticamente para outras cadências com base em ações
+                </p>
+              </CardHeader>
+              <CardContent>
+                {(selectedCadence.rules || []).length === 0 ? (
+                  <div className="text-center py-4 text-muted-foreground">
+                    <Zap className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">Nenhuma regra configurada</p>
+                    <p className="text-xs mt-1">Crie regras para automação inteligente</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {(selectedCadence.rules || []).map(rule => (
+                      <div key={rule.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/50">
+                        <div className="flex items-center gap-3">
+                          <Badge variant="outline" className="text-xs">
+                            {triggerEventLabels[rule.trigger_event] || rule.trigger_event}
+                          </Badge>
+                          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-sm font-medium">
+                            {rule.target_cadence?.name || 'Cadência'}
+                          </span>
+                          {rule.delay_hours > 0 && (
+                            <Badge variant="secondary" className="text-[10px]">
+                              +{rule.delay_hours}h
+                            </Badge>
+                          )}
+                        </div>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleDeleteRule(rule.id)}>
+                          <Trash2 className="w-3 h-3 text-destructive" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Funnel Section */}
           <Card className="card-gradient border-border/50">
             <CardHeader className="pb-3">
