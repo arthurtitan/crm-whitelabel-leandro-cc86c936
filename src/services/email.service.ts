@@ -340,3 +340,13 @@ export const emailApiService = {
     await apiClient.delete(API_ENDPOINTS.EMAIL.RULE(id));
   },
 };
+
+// ==================== DYNAMIC SERVICE SELECTOR ====================
+import { emailCloudService } from './email.cloud.service';
+
+/**
+ * Automatically selects the correct service based on VITE_USE_BACKEND.
+ * Cloud mode → Supabase direct queries
+ * Backend mode → Express API calls
+ */
+export const emailService = useBackend ? emailApiService : emailCloudService;
