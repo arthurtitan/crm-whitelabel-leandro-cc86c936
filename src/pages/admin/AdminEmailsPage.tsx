@@ -22,7 +22,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
-  emailApiService,
+  emailService,
   type EmailCadence,
   type EmailCadenceStep,
   type EmailCadenceRule,
