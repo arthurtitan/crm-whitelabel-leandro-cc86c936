@@ -1,8 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
+import { PrismaClient } from '@prisma/client';
 import { emailService } from '../services/email.service';
 import { emailAiService } from '../services/email-ai.service';
 import { sendgridService } from '../services/sendgrid.service';
 import { logger } from '../utils/logger';
+
+const prisma = new PrismaClient();
 
 export const emailController = {
   // ==================== CADENCES ====================
