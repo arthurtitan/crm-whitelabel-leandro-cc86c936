@@ -236,6 +236,39 @@ export const emailController = {
     } catch (error) { next(error); }
   },
 
+  // ==================== CADENCE RULES ====================
+
+  async listRules(req: Request, res: Response, next: NextFunction) {
+    try {
+      const rules = await emailService.listRules(req.params.id as string);
+      res.json(rules);
+    } catch (error) { next(error); }
+  },
+
+  async createRule(req: Request, res: Response, next: NextFunction) {
+    try {
+      const rule = await emailService.createRule({
+        cadenceId: req.params.id as string,
+        ...req.body,
+      });
+      res.status(201).json(rule);
+    } catch (error) { next(error); }
+  },
+
+  async updateRule(req: Request, res: Response, next: NextFunction) {
+    try {
+      const rule = await emailService.updateRule(req.params.id as string, req.body);
+      res.json(rule);
+    } catch (error) { next(error); }
+  },
+
+  async deleteRule(req: Request, res: Response, next: NextFunction) {
+    try {
+      await emailService.deleteRule(req.params.id as string);
+      res.json({ success: true });
+    } catch (error) { next(error); }
+  },
+
   // ==================== CONNECTIONS ====================
 
   async testSendgrid(req: Request, res: Response, next: NextFunction) {
