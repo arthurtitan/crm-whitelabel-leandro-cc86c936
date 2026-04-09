@@ -190,6 +190,8 @@ export const API_ENDPOINTS = {
     SENDS: '/api/email/sends',
     SEND_STATS: '/api/email/sends/stats',
     AI_GENERATE: '/api/email/ai/generate',
+    SETTINGS: '/api/email/settings',
+    PROCESS_QUEUE: '/api/email/process',
     TEST_SENDGRID: '/api/email/test-connection',
     TEST_SEND: '/api/email/test-send',
     TEST_OPENAI: '/api/email/test-openai',
