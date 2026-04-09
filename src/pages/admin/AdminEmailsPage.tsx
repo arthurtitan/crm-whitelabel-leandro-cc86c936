@@ -30,8 +30,10 @@ import {
   type GeneratedEmail,
   type EmailSend,
 } from '@/services/email.service';
+import { useBackend } from '@/config/backend.config';
 import { apiClient } from '@/api/client';
 import { API_ENDPOINTS } from '@/api/endpoints';
+import { supabase } from '@/integrations/supabase/client';
 
 // ==================== TYPES ====================
 interface FunnelStage {
@@ -97,14 +99,26 @@ export default function AdminEmailsPage() {
 
   const loadFunnelStages = useCallback(async () => {
     try {
-      const tagsRes = await apiClient.get<any>(API_ENDPOINTS.TAGS.LIST, { params: { type: 'stage', ativo: true } });
-      const tags: any[] = tagsRes?.data ?? tagsRes ?? [];
+      let tags: any[] = [];
+      let leadTags: any[] = [];
+      let contacts: any[] = [];
 
-      const leadTagsRes = await apiClient.get<any>('/api/lead-tags');
-      const leadTags: any[] = leadTagsRes?.data ?? leadTagsRes ?? [];
+      if (useBackend) {
+        const tagsRes = await apiClient.get<any>(API_ENDPOINTS.TAGS.LIST, { params: { type: 'stage', ativo: true } });
+        tags = tagsRes?.data ?? tagsRes ?? [];
+        const leadTagsRes = await apiClient.get<any>('/api/lead-tags');
+        leadTags = leadTagsRes?.data ?? leadTagsRes ?? [];
+        const contactsRes = await apiClient.get<any>(API_ENDPOINTS.CONTACTS.LIST);
+        contacts = contactsRes?.data ?? contactsRes ?? [];
+      } else {
+        const { data: tagsData } = await supabase.from('tags').select('*').eq('type', 'stage').eq('ativo', true).order('ordem');
+        tags = tagsData || [];
+        const { data: ltData } = await supabase.from('lead_tags').select('*');
+        leadTags = ltData || [];
+        const { data: cData } = await supabase.from('contacts').select('id, nome, email');
+        contacts = cData || [];
+      }
 
-      const contactsRes = await apiClient.get<any>(API_ENDPOINTS.CONTACTS.LIST);
-      const contacts: any[] = contactsRes?.data ?? contactsRes ?? [];
       const contactMap = new Map(contacts.map((c: any) => [c.id, c]));
 
       const stages: FunnelStage[] = tags
