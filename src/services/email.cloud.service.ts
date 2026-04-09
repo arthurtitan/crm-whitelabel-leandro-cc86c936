@@ -235,7 +235,7 @@ export const emailCloudService = {
       // filter via enrollment
     }
     if (filters?.contactId) query = query.eq('contact_id', filters.contactId);
-    if (filters?.status) query = query.eq('status', filters.status);
+    if (filters?.status) query = query.eq('status', filters.status as any);
     query = query.order('created_at', { ascending: false }).limit(filters?.limit || 50);
     if (filters?.offset) query = query.range(filters.offset, filters.offset + (filters.limit || 50) - 1);
     
