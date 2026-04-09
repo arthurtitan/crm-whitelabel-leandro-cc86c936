@@ -20,6 +20,10 @@ export interface CreateAccountInput {
 
 export interface UpdateAccountInput extends Partial<CreateAccountInput> {
   status?: AccountStatus;
+  openaiApiKey?: string | null;
+  sendgridApiKey?: string | null;
+  sendgridFromEmail?: string | null;
+  sendgridFromName?: string | null;
 }
 
 export interface AccountFilters {
@@ -169,6 +173,10 @@ class AccountService {
         googleClientId: input.googleClientId,
         googleClientSecret: input.googleClientSecret,
         googleRedirectUri: input.googleRedirectUri,
+        openaiApiKey: input.openaiApiKey,
+        sendgridApiKey: input.sendgridApiKey,
+        sendgridFromEmail: input.sendgridFromEmail,
+        sendgridFromName: input.sendgridFromName,
       },
     });
 
