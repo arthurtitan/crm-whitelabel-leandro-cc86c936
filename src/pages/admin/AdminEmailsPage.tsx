@@ -55,8 +55,13 @@ export default function AdminEmailsPage() {
   // Dialogs
   const [showCadenceDialog, setShowCadenceDialog] = useState(false);
   const [showStepDialog, setShowStepDialog] = useState(false);
+  const [showRuleDialog, setShowRuleDialog] = useState(false);
+  const [showEnrollConfirm, setShowEnrollConfirm] = useState(false);
   const [editingCadence, setEditingCadence] = useState<EmailCadence | null>(null);
   const [editingStep, setEditingStep] = useState<EmailCadenceStep | null>(null);
+
+  // Rules
+  const [ruleForm, setRuleForm] = useState({ triggerEvent: 'opened', targetCadenceId: '', delayHours: 0 });
 
   // AI Assistant
   const [aiPrompt, setAiPrompt] = useState('');
