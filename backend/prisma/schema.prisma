@@ -40,6 +40,8 @@ model Account {
   sendgridApiKey     String? @map("sendgrid_api_key") @db.VarChar(500)
   sendgridFromEmail  String? @map("sendgrid_from_email") @db.VarChar(255)
   sendgridFromName   String? @map("sendgrid_from_name") @db.VarChar(255)
+  emailBatchSize     Int     @default(100) @map("email_batch_size")
+  emailDelayMs       Int     @default(500) @map("email_delay_ms")
 
   // Relations
   users               User[]
@@ -657,12 +659,36 @@ model EmailCadence {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  account     Account           @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  steps       EmailCadenceStep[]
-  enrollments EmailEnrollment[]
+  account      Account              @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  steps        EmailCadenceStep[]
+  enrollments  EmailEnrollment[]
+  rulesFrom    EmailCadenceRule[]   @relation("RulesFromCadence")
+  rulesTo      EmailCadenceRule[]   @relation("RulesToCadence")
 
   @@index([accountId])
   @@map("email_cadences")
+}
+
+// ============================================
+// EMAIL CADENCE RULES (branching)
+// ============================================
+model EmailCadenceRule {
+  id              String  @id @default(uuid()) @db.Uuid
+  cadenceId       String  @map("cadence_id") @db.Uuid
+  triggerEvent    String  @map("trigger_event") @db.VarChar(50)
+  targetCadenceId String  @map("target_cadence_id") @db.Uuid
+  delayHours      Int     @default(0) @map("delay_hours")
+  active          Boolean @default(true)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  cadence       EmailCadence @relation("RulesFromCadence", fields: [cadenceId], references: [id], onDelete: Cascade)
+  targetCadence EmailCadence @relation("RulesToCadence", fields: [targetCadenceId], references: [id], onDelete: Cascade)
+
+  @@index([cadenceId])
+  @@index([triggerEvent])
+  @@map("email_cadence_rules")
 }
 
 // ============================================
