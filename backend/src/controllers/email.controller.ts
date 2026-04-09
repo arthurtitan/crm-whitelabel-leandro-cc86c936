@@ -195,9 +195,6 @@ export const emailController = {
   async getSettings(req: Request, res: Response, next: NextFunction) {
     try {
       const accountId = (req as any).accountId;
-      const account = await require('@prisma/client').PrismaClient.prototype ? null : null;
-      const { PrismaClient } = require('@prisma/client');
-      const prisma = new PrismaClient();
       const acc = await prisma.account.findUnique({
         where: { id: accountId },
         select: {
@@ -220,8 +217,6 @@ export const emailController = {
     try {
       const accountId = (req as any).accountId;
       const { openaiApiKey, sendgridApiKey, sendgridFromEmail, sendgridFromName } = req.body;
-      const { PrismaClient } = require('@prisma/client');
-      const prisma = new PrismaClient();
       const data: any = {};
       if (openaiApiKey !== undefined) data.openaiApiKey = openaiApiKey || null;
       if (sendgridApiKey !== undefined) data.sendgridApiKey = sendgridApiKey || null;
@@ -236,7 +231,6 @@ export const emailController = {
 
   async processQueue(req: Request, res: Response, next: NextFunction) {
     try {
-      const { emailService } = require('../services/email.service');
       const processed = await emailService.processCadenceQueue();
       res.json({ success: true, processed });
     } catch (error) { next(error); }
