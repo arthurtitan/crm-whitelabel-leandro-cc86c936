@@ -36,6 +36,10 @@ export interface UpdateAccountInput {
   google_client_id?: string;
   google_client_secret?: string;
   google_redirect_uri?: string;
+  openai_api_key?: string;
+  sendgrid_api_key?: string;
+  sendgrid_from_email?: string;
+  sendgrid_from_name?: string;
 }
 
 export const accountsCloudService = {

@@ -22,7 +22,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
-  emailApiService,
+  emailService,
   type EmailCadence,
   type EmailCadenceStep,
   type EmailCadenceRule,
@@ -30,8 +30,10 @@ import {
   type GeneratedEmail,
   type EmailSend,
 } from '@/services/email.service';
+import { useBackend } from '@/config/backend.config';
 import { apiClient } from '@/api/client';
 import { API_ENDPOINTS } from '@/api/endpoints';
+import { supabase } from '@/integrations/supabase/client';
 
 // ==================== TYPES ====================
 interface FunnelStage {
@@ -78,9 +80,9 @@ export default function AdminEmailsPage() {
     setLoading(true);
     try {
       const [cadencesData, statsData, sendsData] = await Promise.all([
-        emailApiService.listCadences(),
-        emailApiService.getSendStats().catch(() => ({ total: 0, sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, failed: 0 })),
-        emailApiService.listSends({ limit: 10 }).catch(() => []),
+        emailService.listCadences(),
+        emailService.getSendStats().catch(() => ({ total: 0, sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, failed: 0 })),
+        emailService.listSends({ limit: 10 }).catch(() => []),
       ]);
       setCadences(cadencesData);
       setStats(statsData);
@@ -97,14 +99,26 @@ export default function AdminEmailsPage() {
 
   const loadFunnelStages = useCallback(async () => {
     try {
-      const tagsRes = await apiClient.get<any>(API_ENDPOINTS.TAGS.LIST, { params: { type: 'stage', ativo: true } });
-      const tags: any[] = tagsRes?.data ?? tagsRes ?? [];
+      let tags: any[] = [];
+      let leadTags: any[] = [];
+      let contacts: any[] = [];
 
-      const leadTagsRes = await apiClient.get<any>('/api/lead-tags');
-      const leadTags: any[] = leadTagsRes?.data ?? leadTagsRes ?? [];
+      if (useBackend) {
+        const tagsRes = await apiClient.get<any>(API_ENDPOINTS.TAGS.LIST, { params: { type: 'stage', ativo: true } });
+        tags = tagsRes?.data ?? tagsRes ?? [];
+        const leadTagsRes = await apiClient.get<any>('/api/lead-tags');
+        leadTags = leadTagsRes?.data ?? leadTagsRes ?? [];
+        const contactsRes = await apiClient.get<any>(API_ENDPOINTS.CONTACTS.LIST);
+        contacts = contactsRes?.data ?? contactsRes ?? [];
+      } else {
+        const { data: tagsData } = await supabase.from('tags').select('*').eq('type', 'stage').eq('ativo', true).order('ordem');
+        tags = tagsData || [];
+        const { data: ltData } = await supabase.from('lead_tags').select('*');
+        leadTags = ltData || [];
+        const { data: cData } = await supabase.from('contacts').select('id, nome, email');
+        contacts = cData || [];
+      }
 
-      const contactsRes = await apiClient.get<any>(API_ENDPOINTS.CONTACTS.LIST);
-      const contacts: any[] = contactsRes?.data ?? contactsRes ?? [];
       const contactMap = new Map(contacts.map((c: any) => [c.id, c]));
 
       const stages: FunnelStage[] = tags
@@ -136,12 +150,12 @@ export default function AdminEmailsPage() {
   const handleSaveCadence = async () => {
     try {
       if (editingCadence) {
-        const updated = await emailApiService.updateCadence(editingCadence.id, cadenceForm);
+        const updated = await emailService.updateCadence(editingCadence.id, cadenceForm);
         setCadences(prev => prev.map(c => c.id === updated.id ? updated : c));
         if (selectedCadence?.id === updated.id) setSelectedCadence(updated);
         toast.success('Cadência atualizada!');
       } else {
-        const created = await emailApiService.createCadence(cadenceForm);
+        const created = await emailService.createCadence(cadenceForm);
         setCadences(prev => [created, ...prev]);
         setSelectedCadence(created);
         toast.success('Cadência criada!');
@@ -156,7 +170,7 @@ export default function AdminEmailsPage() {
 
   const handleDeleteCadence = async (id: string) => {
     try {
-      await emailApiService.deleteCadence(id);
+      await emailService.deleteCadence(id);
       setCadences(prev => prev.filter(c => c.id !== id));
       if (selectedCadence?.id === id) setSelectedCadence(null);
       toast.success('Cadência excluída!');
@@ -170,17 +184,17 @@ export default function AdminEmailsPage() {
     if (!selectedCadence) return;
     try {
       if (editingStep) {
-        await emailApiService.updateStep(editingStep.id, stepForm);
+        await emailService.updateStep(editingStep.id, stepForm);
         toast.success('Step atualizado!');
       } else {
-        await emailApiService.createStep(selectedCadence.id, stepForm);
+        await emailService.createStep(selectedCadence.id, stepForm);
         toast.success('Step criado!');
       }
       setShowStepDialog(false);
       setStepForm({ dayNumber: 1, subject: '', bodyHtml: '', bodyText: '' });
       setEditingStep(null);
       // Reload cadence
-      const updated = await emailApiService.getCadence(selectedCadence.id);
+      const updated = await emailService.getCadence(selectedCadence.id);
       setSelectedCadence(updated);
       setCadences(prev => prev.map(c => c.id === updated.id ? updated : c));
     } catch (err: any) {
@@ -191,8 +205,8 @@ export default function AdminEmailsPage() {
   const handleDeleteStep = async (stepId: string) => {
     if (!selectedCadence) return;
     try {
-      await emailApiService.deleteStep(stepId);
-      const updated = await emailApiService.getCadence(selectedCadence.id);
+      await emailService.deleteStep(stepId);
+      const updated = await emailService.getCadence(selectedCadence.id);
       setSelectedCadence(updated);
       setCadences(prev => prev.map(c => c.id === updated.id ? updated : c));
       toast.success('Step excluído!');
@@ -206,7 +220,7 @@ export default function AdminEmailsPage() {
     if (!aiPrompt.trim()) return;
     setAiGenerating(true);
     try {
-      const result = await emailApiService.generateEmail(aiPrompt, {
+      const result = await emailService.generateEmail(aiPrompt, {
         leadName: selectedLead?.nome,
         leadEmail: selectedLead?.email,
         stageName: selectedStage?.name,
@@ -248,7 +262,7 @@ export default function AdminEmailsPage() {
     const contactIds = selectedStage.contacts.filter(c => c.email).map(c => c.id);
     setShowEnrollConfirm(false);
     try {
-      await emailApiService.enroll(selectedCadence.id, contactIds);
+      await emailService.enroll(selectedCadence.id, contactIds);
       toast.success(`${contactIds.length} contato(s) inscritos na cadência "${selectedCadence.name}"!`);
     } catch (err: any) {
       toast.error(err?.message || 'Erro ao inscrever contatos');
@@ -259,11 +273,11 @@ export default function AdminEmailsPage() {
   const handleSaveRule = async () => {
     if (!selectedCadence || !ruleForm.targetCadenceId) return;
     try {
-      await emailApiService.createRule(selectedCadence.id, ruleForm);
+      await emailService.createRule(selectedCadence.id, ruleForm);
       toast.success('Regra de ramificação criada!');
       setShowRuleDialog(false);
       setRuleForm({ triggerEvent: 'opened', targetCadenceId: '', delayHours: 0 });
-      const updated = await emailApiService.getCadence(selectedCadence.id);
+      const updated = await emailService.getCadence(selectedCadence.id);
       setSelectedCadence(updated);
       setCadences(prev => prev.map(c => c.id === updated.id ? updated : c));
     } catch (err: any) {
@@ -274,9 +288,9 @@ export default function AdminEmailsPage() {
   const handleDeleteRule = async (ruleId: string) => {
     if (!selectedCadence) return;
     try {
-      await emailApiService.deleteRule(ruleId);
+      await emailService.deleteRule(ruleId);
       toast.success('Regra excluída!');
-      const updated = await emailApiService.getCadence(selectedCadence.id);
+      const updated = await emailService.getCadence(selectedCadence.id);
       setSelectedCadence(updated);
       setCadences(prev => prev.map(c => c.id === updated.id ? updated : c));
     } catch (err: any) {
