@@ -318,4 +318,24 @@ export const emailApiService = {
     const res = await apiClient.post<any>(API_ENDPOINTS.EMAIL.TEST_OPENAI, { apiKey });
     return unwrap(res);
   },
+
+  // Cadence Rules
+  async listRules(cadenceId: string): Promise<EmailCadenceRule[]> {
+    const res = await apiClient.get<any>(API_ENDPOINTS.EMAIL.CADENCE_RULES(cadenceId));
+    return (unwrap<any[]>(res) || []).map(mapRule);
+  },
+
+  async createRule(cadenceId: string, data: { triggerEvent: string; targetCadenceId: string; delayHours?: number }): Promise<EmailCadenceRule> {
+    const res = await apiClient.post<any>(API_ENDPOINTS.EMAIL.CADENCE_RULES(cadenceId), data);
+    return mapRule(unwrap(res));
+  },
+
+  async updateRule(id: string, data: Partial<{ triggerEvent: string; targetCadenceId: string; delayHours: number; active: boolean }>): Promise<EmailCadenceRule> {
+    const res = await apiClient.put<any>(API_ENDPOINTS.EMAIL.RULE(id), data);
+    return mapRule(unwrap(res));
+  },
+
+  async deleteRule(id: string): Promise<void> {
+    await apiClient.delete(API_ENDPOINTS.EMAIL.RULE(id));
+  },
 };
