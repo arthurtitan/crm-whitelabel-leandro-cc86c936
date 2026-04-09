@@ -70,7 +70,7 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-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}
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-https://goodleads.mychooice.com/api/calendar/google/callback}
       LOG_LEVEL: ${LOG_LEVEL:-info}
-      BUILD_VERSION: "2026-04-08-fix-white-screen-v2"
+      BUILD_VERSION: "2026-04-09-email-module-fix"
       RUN_SEED: ${RUN_SEED:-true}
     expose:
       - "3000"
