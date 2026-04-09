@@ -21,6 +21,18 @@ export interface EmailCadenceStep {
   updated_at: string;
 }
 
+export interface EmailCadenceRule {
+  id: string;
+  cadence_id: string;
+  trigger_event: 'opened' | 'clicked' | 'replied' | 'not_opened' | 'bounced';
+  target_cadence_id: string;
+  delay_hours: number;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+  target_cadence?: { id: string; name: string };
+}
+
 export interface EmailCadence {
   id: string;
   account_id: string;
@@ -32,6 +44,7 @@ export interface EmailCadence {
   created_at: string;
   updated_at: string;
   steps?: EmailCadenceStep[];
+  rules?: EmailCadenceRule[];
 }
 
 export interface EmailTemplate {
