@@ -24,8 +24,8 @@ export const emailCloudService = {
     return (data || []).map(c => ({
       ...c,
       steps: (c.steps || []).sort((a: any, b: any) => a.day_number - b.day_number),
-      rules: c.rules || [],
-    }));
+      rules: (c.rules || []).map((r: any) => ({ ...r, trigger_event: r.trigger_event as EmailCadenceRule['trigger_event'] })),
+    })) as EmailCadence[];
   },
 
   async getCadence(id: string): Promise<EmailCadence> {
@@ -38,8 +38,8 @@ export const emailCloudService = {
     return {
       ...data,
       steps: (data.steps || []).sort((a: any, b: any) => a.day_number - b.day_number),
-      rules: data.rules || [],
-    };
+      rules: (data.rules || []).map((r: any) => ({ ...r, trigger_event: r.trigger_event as EmailCadenceRule['trigger_event'] })),
+    } as EmailCadence;
   },
 
   async createCadence(input: { name: string; description?: string; targetStageIds?: string[] }): Promise<EmailCadence> {
@@ -81,8 +81,8 @@ export const emailCloudService = {
     return {
       ...data,
       steps: (data.steps || []).sort((a: any, b: any) => a.day_number - b.day_number),
-      rules: data.rules || [],
-    };
+      rules: (data.rules || []).map((r: any) => ({ ...r, trigger_event: r.trigger_event as EmailCadenceRule['trigger_event'] })),
+    } as EmailCadence;
   },
 
   async deleteCadence(id: string): Promise<void> {
