@@ -20,6 +20,10 @@ const createAccountSchema = z.object({
 
 const updateAccountSchema = createAccountSchema.partial().extend({
   status: z.enum(['active', 'paused', 'cancelled']).optional(),
+  openaiApiKey: z.string().optional().nullable(),
+  sendgridApiKey: z.string().optional().nullable(),
+  sendgridFromEmail: z.string().email().optional().nullable(),
+  sendgridFromName: z.string().optional().nullable(),
 });
 
 const listAccountsSchema = z.object({
