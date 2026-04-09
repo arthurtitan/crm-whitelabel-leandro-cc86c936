@@ -1,8 +1,9 @@
 /**
  * Email Module Frontend Service
- * Communicates with the Express backend email API.
+ * Dynamically switches between Express backend and Supabase Cloud.
  */
 
+import { useBackend } from '@/config/backend.config';
 import { apiClient } from '@/api/client';
 import { API_ENDPOINTS } from '@/api/endpoints';
 
