@@ -10,16 +10,22 @@ import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import {
   Mail, Plus, Send, Eye, MousePointer, AlertTriangle, Clock, Sparkles,
-  Edit2, Trash2, MoreHorizontal, RefreshCw, Loader2, ChevronRight
+  Edit2, Trash2, MoreHorizontal, RefreshCw, Loader2, ChevronRight,
+  GitBranch, Zap
 } from 'lucide-react';
 import EmailSettingsPanel from '@/components/email/EmailSettingsPanel';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   emailApiService,
   type EmailCadence,
   type EmailCadenceStep,
+  type EmailCadenceRule,
   type SendStats,
   type GeneratedEmail,
   type EmailSend,
