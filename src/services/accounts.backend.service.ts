@@ -69,6 +69,10 @@ export const accountsBackendService = {
       googleClientId: input.google_client_id,
       googleClientSecret: input.google_client_secret,
       googleRedirectUri: input.google_redirect_uri,
+      openaiApiKey: input.openai_api_key,
+      sendgridApiKey: input.sendgrid_api_key,
+      sendgridFromEmail: input.sendgrid_from_email,
+      sendgridFromName: input.sendgrid_from_name,
     });
     const raw = response?.data ?? response;
     return mapAccount(raw);
