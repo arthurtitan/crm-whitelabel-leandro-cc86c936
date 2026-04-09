@@ -7,12 +7,20 @@ import { logger } from '../utils/logger';
 
 const prisma = new PrismaClient();
 
+// Helper to extract accountId/userId from authenticated request
+function getAccountId(req: Request): string {
+  return (req as any).user?.accountId;
+}
+function getUserId(req: Request): string {
+  return (req as any).user?.id;
+}
+
 export const emailController = {
   // ==================== CADENCES ====================
 
   async listCadences(req: Request, res: Response, next: NextFunction) {
     try {
-      const accountId = (req as any).accountId;
+      const accountId = getAccountId(req);
       const cadences = await emailService.listCadences(accountId);
       res.json(cadences);
     } catch (error) { next(error); }
@@ -20,7 +28,7 @@ export const emailController = {
 
   async getCadence(req: Request, res: Response, next: NextFunction) {
     try {
-      const accountId = (req as any).accountId;
+      const accountId = getAccountId(req);
       const cadence = await emailService.getCadence(req.params.id as string, accountId);
       if (!cadence) return res.status(404).json({ error: 'Cadência não encontrada' });
       res.json(cadence);
@@ -29,8 +37,8 @@ export const emailController = {
 
   async createCadence(req: Request, res: Response, next: NextFunction) {
     try {
-      const accountId = (req as any).accountId;
-      const userId = (req as any).userId;
+      const accountId = getAccountId(req);
+      const userId = getUserId(req);
       const cadence = await emailService.createCadence({
         accountId,
         ...req.body,
@@ -42,7 +50,7 @@ export const emailController = {
 
   async updateCadence(req: Request, res: Response, next: NextFunction) {
     try {
-      const accountId = (req as any).accountId;
+      const accountId = getAccountId(req);
       const cadence = await emailService.updateCadence(req.params.id as string, accountId, req.body);
       res.json(cadence);
     } catch (error) { next(error); }
@@ -50,7 +58,7 @@ export const emailController = {
 
   async deleteCadence(req: Request, res: Response, next: NextFunction) {
     try {
-      const accountId = (req as any).accountId;
+      const accountId = getAccountId(req);
       await emailService.deleteCadence(req.params.id as string, accountId);
       res.json({ success: true });
     } catch (error) { next(error); }
@@ -60,7 +68,7 @@ export const emailController = {
 
   async listSteps(req: Request, res: Response, next: NextFunction) {
     try {
-      const cadence = await emailService.getCadence(req.params.id as string, (req as any).accountId);
+      const cadence = await emailService.getCadence(req.params.id as string, getAccountId(req));
       res.json(cadence?.steps || []);
     } catch (error) { next(error); }
   },
@@ -90,7 +98,7 @@ export const emailController = {
 
   async listTemplates(req: Request, res: Response, next: NextFunction) {
     try {
-      const accountId = (req as any).accountId;
+      const accountId = getAccountId(req);
       const templates = await emailService.listTemplates(accountId);
       res.json(templates);
     } catch (error) { next(error); }
@@ -98,8 +106,8 @@ export const emailController = {
 
   async createTemplate(req: Request, res: Response, next: NextFunction) {
     try {
-      const accountId = (req as any).accountId;
-      const userId = (req as any).userId;
+      const accountId = getAccountId(req);
+      const userId = getUserId(req);
       const template = await emailService.createTemplate({
         accountId,
         ...req.body,
@@ -127,7 +135,7 @@ export const emailController = {
 
   async enroll(req: Request, res: Response, next: NextFunction) {
     try {
-      const accountId = (req as any).accountId;
+      const accountId = getAccountId(req);
       const enrollments = await emailService.enrollContacts({
         accountId,
         cadenceId: req.body.cadenceId,
@@ -146,7 +154,7 @@ export const emailController = {
 
   async listEnrollments(req: Request, res: Response, next: NextFunction) {
     try {
-      const accountId = (req as any).accountId;
+      const accountId = getAccountId(req);
       const enrollments = await emailService.listEnrollments(accountId, req.query.cadenceId as string);
       res.json(enrollments);
     } catch (error) { next(error); }
@@ -156,7 +164,7 @@ export const emailController = {
 
   async listSends(req: Request, res: Response, next: NextFunction) {
     try {
-      const accountId = (req as any).accountId;
+      const accountId = getAccountId(req);
       const sends = await emailService.listSends(accountId, {
         cadenceId: req.query.cadenceId as string,
         contactId: req.query.contactId as string,
@@ -170,7 +178,7 @@ export const emailController = {
 
   async getSendStats(req: Request, res: Response, next: NextFunction) {
     try {
-      const accountId = (req as any).accountId;
+      const accountId = getAccountId(req);
       const stats = await emailService.getSendStats(accountId);
       res.json(stats);
     } catch (error) { next(error); }
@@ -180,7 +188,7 @@ export const emailController = {
 
   async generateEmail(req: Request, res: Response, next: NextFunction) {
     try {
-      const accountId = (req as any).accountId;
+      const accountId = getAccountId(req);
       const result = await emailAiService.generateEmail({
         accountId,
         prompt: req.body.prompt,
@@ -194,7 +202,7 @@ export const emailController = {
 
   async getSettings(req: Request, res: Response, next: NextFunction) {
     try {
-      const accountId = (req as any).accountId;
+      const accountId = getAccountId(req);
       const acc = await prisma.account.findUnique({
         where: { id: accountId },
         select: {
@@ -215,7 +223,7 @@ export const emailController = {
 
   async updateSettings(req: Request, res: Response, next: NextFunction) {
     try {
-      const accountId = (req as any).accountId;
+      const accountId = getAccountId(req);
       const { openaiApiKey, sendgridApiKey, sendgridFromEmail, sendgridFromName } = req.body;
       const data: any = {};
       if (openaiApiKey !== undefined) data.openaiApiKey = openaiApiKey || null;
