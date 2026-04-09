@@ -259,9 +259,30 @@ export const emailApiService = {
     return unwrap<GeneratedEmail>(res);
   },
 
+  // Settings
+  async getSettings(): Promise<{ hasOpenaiKey: boolean; hasSendgridKey: boolean; sendgridFromEmail: string; sendgridFromName: string }> {
+    const res = await apiClient.get<any>(API_ENDPOINTS.EMAIL.SETTINGS);
+    return unwrap(res);
+  },
+
+  async updateSettings(data: { openaiApiKey?: string; sendgridApiKey?: string; sendgridFromEmail?: string; sendgridFromName?: string }): Promise<void> {
+    await apiClient.put(API_ENDPOINTS.EMAIL.SETTINGS, data);
+  },
+
+  // Process queue
+  async processQueue(): Promise<{ success: boolean; processed: number }> {
+    const res = await apiClient.post<any>(API_ENDPOINTS.EMAIL.PROCESS_QUEUE, {});
+    return unwrap(res);
+  },
+
   // Tests
   async testSendgrid(apiKey: string): Promise<{ success: boolean; message: string }> {
     const res = await apiClient.post<any>(API_ENDPOINTS.EMAIL.TEST_SENDGRID, { apiKey });
+    return unwrap(res);
+  },
+
+  async testSendEmail(apiKey: string, fromEmail: string, fromName: string, toEmail: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    const res = await apiClient.post<any>(API_ENDPOINTS.EMAIL.TEST_SEND, { apiKey, fromEmail, fromName, toEmail });
     return unwrap(res);
   },
 

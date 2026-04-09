@@ -42,6 +42,13 @@ router.get('/sends/stats', requirePermission('emails'), (req, res, next) => emai
 // AI
 router.post('/ai/generate', requirePermission('emails'), (req, res, next) => emailController.generateEmail(req, res, next));
 
+// Settings
+router.get('/settings', requirePermission('emails'), (req, res, next) => emailController.getSettings(req, res, next));
+router.put('/settings', requirePermission('emails'), (req, res, next) => emailController.updateSettings(req, res, next));
+
+// Processor
+router.post('/process', requirePermission('emails'), (req, res, next) => emailController.processQueue(req, res, next));
+
 // Connection tests
 router.post('/test-connection', requirePermission('emails'), (req, res, next) => emailController.testSendgrid(req, res, next));
 router.post('/test-send', requirePermission('emails'), (req, res, next) => emailController.testSendEmail(req, res, next));

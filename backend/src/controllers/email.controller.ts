@@ -1,8 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
+import { PrismaClient } from '@prisma/client';
 import { emailService } from '../services/email.service';
 import { emailAiService } from '../services/email-ai.service';
 import { sendgridService } from '../services/sendgrid.service';
 import { logger } from '../utils/logger';
+
+const prisma = new PrismaClient();
 
 export const emailController = {
   // ==================== CADENCES ====================
@@ -184,6 +187,52 @@ export const emailController = {
         context: req.body.context,
       });
       res.json(result);
+    } catch (error) { next(error); }
+  },
+
+  // ==================== SETTINGS ====================
+
+  async getSettings(req: Request, res: Response, next: NextFunction) {
+    try {
+      const accountId = (req as any).accountId;
+      const acc = await prisma.account.findUnique({
+        where: { id: accountId },
+        select: {
+          openaiApiKey: true,
+          sendgridApiKey: true,
+          sendgridFromEmail: true,
+          sendgridFromName: true,
+        },
+      });
+      res.json({
+        hasOpenaiKey: !!acc?.openaiApiKey,
+        hasSendgridKey: !!acc?.sendgridApiKey,
+        sendgridFromEmail: acc?.sendgridFromEmail || '',
+        sendgridFromName: acc?.sendgridFromName || '',
+      });
+    } catch (error) { next(error); }
+  },
+
+  async updateSettings(req: Request, res: Response, next: NextFunction) {
+    try {
+      const accountId = (req as any).accountId;
+      const { openaiApiKey, sendgridApiKey, sendgridFromEmail, sendgridFromName } = req.body;
+      const data: any = {};
+      if (openaiApiKey !== undefined) data.openaiApiKey = openaiApiKey || null;
+      if (sendgridApiKey !== undefined) data.sendgridApiKey = sendgridApiKey || null;
+      if (sendgridFromEmail !== undefined) data.sendgridFromEmail = sendgridFromEmail || null;
+      if (sendgridFromName !== undefined) data.sendgridFromName = sendgridFromName || null;
+      await prisma.account.update({ where: { id: accountId }, data });
+      res.json({ success: true });
+    } catch (error) { next(error); }
+  },
+
+  // ==================== PROCESSOR ====================
+
+  async processQueue(req: Request, res: Response, next: NextFunction) {
+    try {
+      const processed = await emailService.processCadenceQueue();
+      res.json({ success: true, processed });
     } catch (error) { next(error); }
   },
 
