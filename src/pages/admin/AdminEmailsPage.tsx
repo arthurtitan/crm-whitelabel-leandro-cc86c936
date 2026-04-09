@@ -788,6 +788,91 @@ export default function AdminEmailsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Enrollment Confirmation Dialog */}
+      <AlertDialog open={showEnrollConfirm} onOpenChange={setShowEnrollConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar inscrição na cadência</AlertDialogTitle>
+            <AlertDialogDescription>
+              Você está prestes a inscrever{' '}
+              <strong>{selectedStage?.contacts.filter(c => c.email).length || 0} contato(s)</strong>{' '}
+              com e-mail da etapa <strong>"{selectedStage?.name}"</strong> na cadência{' '}
+              <strong>"{selectedCadence?.name}"</strong>.
+              <br /><br />
+              Os e-mails serão disparados automaticamente de acordo com a programação da cadência.
+              Deseja continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmEnroll}>
+              Confirmar e Inscrever
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Rule Dialog */}
+      <Dialog open={showRuleDialog} onOpenChange={setShowRuleDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nova Regra de Ramificação</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Quando o lead...</label>
+              <Select
+                value={ruleForm.triggerEvent}
+                onValueChange={(v) => setRuleForm(prev => ({ ...prev, triggerEvent: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="opened">📬 Abrir o e-mail</SelectItem>
+                  <SelectItem value="clicked">🖱️ Clicar no link</SelectItem>
+                  <SelectItem value="replied">💬 Responder</SelectItem>
+                  <SelectItem value="not_opened">🚫 Não abrir</SelectItem>
+                  <SelectItem value="bounced">⚠️ Bounce</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Mover para cadência:</label>
+              <Select
+                value={ruleForm.targetCadenceId}
+                onValueChange={(v) => setRuleForm(prev => ({ ...prev, targetCadenceId: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione uma cadência" />
+                </SelectTrigger>
+                <SelectContent>
+                  {cadences.filter(c => c.id !== selectedCadence?.id).map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Aguardar (horas) antes de mover</label>
+              <Input
+                type="number"
+                min={0}
+                value={ruleForm.delayHours}
+                onChange={(e) => setRuleForm(prev => ({ ...prev, delayHours: parseInt(e.target.value) || 0 }))}
+              />
+              <p className="text-xs text-muted-foreground mt-1">0 = mover imediatamente</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRuleDialog(false)}>Cancelar</Button>
+            <Button onClick={handleSaveRule} disabled={!ruleForm.targetCadenceId}>
+              Criar Regra
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
