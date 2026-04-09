@@ -187,6 +187,58 @@ export const emailController = {
     } catch (error) { next(error); }
   },
 
+  // ==================== SETTINGS ====================
+
+  async getSettings(req: Request, res: Response, next: NextFunction) {
+    try {
+      const accountId = (req as any).accountId;
+      const account = await require('@prisma/client').PrismaClient.prototype ? null : null;
+      const { PrismaClient } = require('@prisma/client');
+      const prisma = new PrismaClient();
+      const acc = await prisma.account.findUnique({
+        where: { id: accountId },
+        select: {
+          openaiApiKey: true,
+          sendgridApiKey: true,
+          sendgridFromEmail: true,
+          sendgridFromName: true,
+        },
+      });
+      res.json({
+        hasOpenaiKey: !!acc?.openaiApiKey,
+        hasSendgridKey: !!acc?.sendgridApiKey,
+        sendgridFromEmail: acc?.sendgridFromEmail || '',
+        sendgridFromName: acc?.sendgridFromName || '',
+      });
+    } catch (error) { next(error); }
+  },
+
+  async updateSettings(req: Request, res: Response, next: NextFunction) {
+    try {
+      const accountId = (req as any).accountId;
+      const { openaiApiKey, sendgridApiKey, sendgridFromEmail, sendgridFromName } = req.body;
+      const { PrismaClient } = require('@prisma/client');
+      const prisma = new PrismaClient();
+      const data: any = {};
+      if (openaiApiKey !== undefined) data.openaiApiKey = openaiApiKey || null;
+      if (sendgridApiKey !== undefined) data.sendgridApiKey = sendgridApiKey || null;
+      if (sendgridFromEmail !== undefined) data.sendgridFromEmail = sendgridFromEmail || null;
+      if (sendgridFromName !== undefined) data.sendgridFromName = sendgridFromName || null;
+      await prisma.account.update({ where: { id: accountId }, data });
+      res.json({ success: true });
+    } catch (error) { next(error); }
+  },
+
+  // ==================== PROCESSOR ====================
+
+  async processQueue(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { emailService } = require('../services/email.service');
+      const processed = await emailService.processCadenceQueue();
+      res.json({ success: true, processed });
+    } catch (error) { next(error); }
+  },
+
   // ==================== CONNECTIONS ====================
 
   async testSendgrid(req: Request, res: Response, next: NextFunction) {
