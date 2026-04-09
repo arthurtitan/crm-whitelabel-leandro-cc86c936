@@ -68,7 +68,6 @@ import {
   LayoutDashboard,
   Kanban,
   Users,
-  
   Calendar,
   DollarSign,
   Wallet,
@@ -77,6 +76,8 @@ import {
   RotateCcw,
   Lightbulb,
   Loader2,
+  Crosshair,
+  Mail,
 } from 'lucide-react';
 import { safeFormatDateBR } from '@/utils/dateUtils';
 import { toast } from 'sonner';
