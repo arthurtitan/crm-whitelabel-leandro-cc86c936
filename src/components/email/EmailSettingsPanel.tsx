@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Settings, CheckCircle, XCircle, Eye, EyeOff, Loader2, Play } from 'lucide-react';
-import { emailApiService } from '@/services/email.service';
+import { emailService } from '@/services/email.service';
 
 interface EmailSettings {
   hasOpenaiKey: boolean;
@@ -34,7 +34,7 @@ export default function EmailSettingsPanel() {
 
   const loadSettings = async () => {
     try {
-      const data = await emailApiService.getSettings();
+      const data = await emailService.getSettings();
       setSettings(data);
       setSendgridFromEmail(data.sendgridFromEmail);
       setSendgridFromName(data.sendgridFromName);
@@ -55,7 +55,7 @@ export default function EmailSettingsPanel() {
       if (openaiApiKey) data.openaiApiKey = openaiApiKey;
       if (sendgridApiKey) data.sendgridApiKey = sendgridApiKey;
 
-      await emailApiService.updateSettings(data);
+      await emailService.updateSettings(data);
       await loadSettings();
       setOpenaiApiKey('');
       setSendgridApiKey('');
@@ -74,7 +74,7 @@ export default function EmailSettingsPanel() {
       return;
     }
     try {
-      const result = await emailApiService.testSendgrid(key);
+      const result = await emailService.testSendgrid(key);
       if (result.success) {
         toast.success(result.message);
       } else {
@@ -92,7 +92,7 @@ export default function EmailSettingsPanel() {
       return;
     }
     try {
-      const result = await emailApiService.testOpenai(key);
+      const result = await emailService.testOpenai(key);
       if (result.success) {
         toast.success(result.message);
       } else {
@@ -106,7 +106,7 @@ export default function EmailSettingsPanel() {
   const handleProcessQueue = async () => {
     setProcessing(true);
     try {
-      const result = await emailApiService.processQueue();
+      const result = await emailService.processQueue();
       toast.success(`Fila processada! ${result.processed} enrollment(s) processado(s).`);
     } catch (err: any) {
       toast.error(err?.message || 'Erro ao processar fila');
