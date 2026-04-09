@@ -5,6 +5,7 @@ import rateLimit from 'express-rate-limit';
 import { env, isDevelopment } from './config/env';
 import { connectDatabase } from './config/database';
 import { metricsCollector } from './services/metrics-collector';
+import { emailService } from './services/email.service';
 import { errorHandler, notFoundHandler } from './middlewares/error.middleware';
 import routes from './routes';
 import { logger } from './utils/logger';
@@ -15,6 +16,20 @@ async function bootstrap() {
 
   // Start metrics collector
   metricsCollector.start();
+
+  // Start email cadence cron (every 5 minutes)
+  const EMAIL_CRON_INTERVAL_MS = 5 * 60 * 1000;
+  setInterval(async () => {
+    try {
+      const processed = await emailService.processCadenceQueue();
+      if (processed > 0) {
+        logger.info(`📧 [EmailCron] Processed ${processed} emails`);
+      }
+    } catch (error: any) {
+      logger.error(`📧 [EmailCron] Error: ${error.message}`);
+    }
+  }, EMAIL_CRON_INTERVAL_MS);
+  logger.info(`📧 Email cadence cron started (interval: ${EMAIL_CRON_INTERVAL_MS / 1000}s)`);
 
   const app = express();
 

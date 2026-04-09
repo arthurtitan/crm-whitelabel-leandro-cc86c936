@@ -89,7 +89,9 @@ export type Permission =
   | 'products'
   | 'events'
   | 'insights'
-  | 'refunds';
+  | 'refunds'
+  | 'emails'
+  | 'extracao';
 
 export const ALL_PERMISSIONS: Permission[] = [
   'dashboard',
@@ -102,6 +104,8 @@ export const ALL_PERMISSIONS: Permission[] = [
   'events',
   'insights',
   'refunds',
+  'emails',
+  'extracao',
 ];
 
 // Event types for audit
