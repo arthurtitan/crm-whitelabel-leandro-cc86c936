@@ -183,7 +183,7 @@ export default function AdminEmailsPage() {
       const result = await emailService.generateEmail(aiPrompt, {
         leadName: selectedLead?.nome,
         leadEmail: selectedLead?.email,
-        stageName: selectedStage?.name,
+        stageName: undefined,
       });
       setGeneratedEmail(result);
       toast.success('E-mail gerado com sucesso!');
@@ -661,29 +661,6 @@ export default function AdminEmailsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Enrollment Confirmation */}
-      <AlertDialog open={showEnrollConfirm} onOpenChange={setShowEnrollConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar inscrição na cadência</AlertDialogTitle>
-            <AlertDialogDescription>
-              Você está prestes a inscrever{' '}
-              <strong>{selectedStage?.contacts.filter(c => c.email).length || 0} contato(s)</strong>{' '}
-              com e-mail da etapa <strong>"{selectedStage?.name}"</strong> na cadência{' '}
-              <strong>"{selectedCadence?.name}"</strong>.
-              <br /><br />
-              Os e-mails serão disparados automaticamente de acordo com a programação da cadência.
-              Deseja continuar?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmEnroll}>
-              Confirmar e Inscrever
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* Rule Dialog */}
       <Dialog open={showRuleDialog} onOpenChange={setShowRuleDialog}>
