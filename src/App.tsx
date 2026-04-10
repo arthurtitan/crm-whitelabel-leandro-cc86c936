@@ -1,4 +1,4 @@
-// App root component with authentication and routing
+// App root component with authentication and routing – sync test
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
