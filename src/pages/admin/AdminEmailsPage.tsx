@@ -39,12 +39,7 @@ import EmailEnrollmentsTab from '@/components/email/EmailEnrollmentsTab';
 import EmailSendsTab from '@/components/email/EmailSendsTab';
 
 // ==================== TYPES ====================
-interface FunnelStage {
-  id: string;
-  name: string;
-  color: string;
-  contacts: { id: string; nome?: string; email?: string }[];
-}
+// ==================== COMPONENT ====================
 
 // ==================== COMPONENT ====================
 export default function AdminEmailsPage() {
@@ -52,8 +47,6 @@ export default function AdminEmailsPage() {
   const [cadences, setCadences] = useState<EmailCadence[]>([]);
   const [selectedCadence, setSelectedCadence] = useState<EmailCadence | null>(null);
   const [stats, setStats] = useState<SendStats>({ total: 0, sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, failed: 0 });
-  const [funnelStages, setFunnelStages] = useState<FunnelStage[]>([]);
-  const [selectedStage, setSelectedStage] = useState<FunnelStage | null>(null);
   const [loading, setLoading] = useState(true);
   const [credentialsConfigured, setCredentialsConfigured] = useState<boolean | null>(null);
 
@@ -61,7 +54,7 @@ export default function AdminEmailsPage() {
   const [showCadenceDialog, setShowCadenceDialog] = useState(false);
   const [showStepDialog, setShowStepDialog] = useState(false);
   const [showRuleDialog, setShowRuleDialog] = useState(false);
-  const [showEnrollConfirm, setShowEnrollConfirm] = useState(false);
+  
   const [editingCadence, setEditingCadence] = useState<EmailCadence | null>(null);
   const [editingStep, setEditingStep] = useState<EmailCadenceStep | null>(null);
 
@@ -108,58 +101,11 @@ export default function AdminEmailsPage() {
     }
   }, []);
 
-  const loadFunnelStages = useCallback(async () => {
-    try {
-      let tags: any[] = [];
-      let leadTags: any[] = [];
-      let contacts: any[] = [];
-
-      if (useBackend) {
-        const tagsRes = await apiClient.get<any>(API_ENDPOINTS.TAGS.LIST, { params: { type: 'stage', ativo: true } });
-        tags = tagsRes?.data ?? tagsRes ?? [];
-        const leadTagsRes = await apiClient.get<any>('/api/lead-tags');
-        leadTags = leadTagsRes?.data ?? leadTagsRes ?? [];
-        const contactsRes = await apiClient.get<any>(API_ENDPOINTS.CONTACTS.LIST);
-        contacts = contactsRes?.data ?? contactsRes ?? [];
-      } else {
-        const { data: tagsData } = await supabase.from('tags').select('*').eq('type', 'stage').eq('ativo', true).order('ordem');
-        tags = tagsData || [];
-        const { data: ltData } = await supabase.from('lead_tags').select('*');
-        leadTags = ltData || [];
-        const { data: cData } = await supabase.from('contacts').select('id, nome, email');
-        contacts = cData || [];
-      }
-
-      const contactMap = new Map(contacts.map((c: any) => [c.id, c]));
-
-      const stages: FunnelStage[] = tags
-        .sort((a: any, b: any) => (a.ordem ?? 0) - (b.ordem ?? 0))
-        .map((tag: any) => {
-          const tagContacts = leadTags
-            .filter((lt: any) => (lt.tag_id ?? lt.tagId) === tag.id)
-            .map((lt: any) => contactMap.get(lt.contact_id ?? lt.contactId))
-            .filter(Boolean)
-            .map((c: any) => ({ id: c.id, nome: c.nome, email: c.email }));
-          return {
-            id: tag.id,
-            name: tag.name,
-            color: tag.color || '#6366F1',
-            contacts: tagContacts,
-          };
-        });
-
-      setFunnelStages(stages);
-      if (stages.length > 0 && !selectedStage) setSelectedStage(stages[0]);
-    } catch (err) {
-      console.error('Erro ao carregar funil:', err);
-    }
-  }, []);
 
   useEffect(() => {
     checkCredentials();
     loadData();
-    loadFunnelStages();
-  }, [checkCredentials, loadData, loadFunnelStages]);
+  }, [checkCredentials, loadData]);
 
   // ==================== CADENCE CRUD ====================
   const handleSaveCadence = async () => {
@@ -237,7 +183,7 @@ export default function AdminEmailsPage() {
       const result = await emailService.generateEmail(aiPrompt, {
         leadName: selectedLead?.nome,
         leadEmail: selectedLead?.email,
-        stageName: selectedStage?.name,
+        stageName: undefined,
       });
       setGeneratedEmail(result);
       toast.success('E-mail gerado com sucesso!');
@@ -260,28 +206,6 @@ export default function AdminEmailsPage() {
     toast.info('Texto aplicado ao formulário de step!');
   };
 
-  // ==================== ENROLL ====================
-  const handleEnrollStageContacts = async () => {
-    if (!selectedCadence || !selectedStage) return;
-    const contactIds = selectedStage.contacts.filter(c => c.email).map(c => c.id);
-    if (contactIds.length === 0) {
-      toast.warning('Nenhum contato com e-mail nesta etapa.');
-      return;
-    }
-    setShowEnrollConfirm(true);
-  };
-
-  const confirmEnroll = async () => {
-    if (!selectedCadence || !selectedStage) return;
-    const contactIds = selectedStage.contacts.filter(c => c.email).map(c => c.id);
-    setShowEnrollConfirm(false);
-    try {
-      await emailService.enroll(selectedCadence.id, contactIds);
-      toast.success(`${contactIds.length} contato(s) inscritos na cadência "${selectedCadence.name}"!`);
-    } catch (err: any) {
-      toast.error(err?.message || 'Erro ao inscrever contatos');
-    }
-  };
 
   // ==================== RULES ====================
   const handleSaveRule = async () => {
@@ -570,74 +494,6 @@ export default function AdminEmailsPage() {
                 </Card>
               )}
 
-              {/* Funnel Section */}
-              <Card className="card-gradient border-border/50">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">Funil de Leads</CardTitle>
-                    <Button variant="ghost" size="sm" onClick={loadFunnelStages}>
-                      <RefreshCw className="w-4 h-4 mr-1" /> Atualizar
-                    </Button>
-                  </div>
-                  <p className="text-sm text-muted-foreground">Selecione uma etapa para inscrever leads na cadência</p>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex gap-3 overflow-x-auto pb-2">
-                    {funnelStages.map(stage => (
-                      <button
-                        key={stage.id}
-                        onClick={() => setSelectedStage(stage)}
-                        className={`flex items-center gap-2 px-4 py-3 rounded-lg border-2 min-w-[100px] transition-all ${
-                          selectedStage?.id === stage.id
-                            ? 'border-primary bg-primary/5'
-                            : 'border-border bg-muted/30 hover:bg-muted/50'
-                        }`}
-                      >
-                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: stage.color }} />
-                        <span className="text-lg font-bold">{stage.contacts.length}</span>
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">{stage.name}</span>
-                      </button>
-                    ))}
-                  </div>
-
-                  {selectedStage && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-medium flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: selectedStage.color }} />
-                          {selectedStage.name} ({selectedStage.contacts.length})
-                        </p>
-                        {selectedCadence && (
-                          <Button size="sm" variant="outline" onClick={handleEnrollStageContacts}>
-                            <Mail className="w-3 h-3 mr-1" /> Inscrever na cadência
-                          </Button>
-                        )}
-                      </div>
-                      <div className="space-y-1 max-h-[200px] overflow-y-auto">
-                        {selectedStage.contacts.slice(0, 10).map(contact => (
-                          <div
-                            key={contact.id}
-                            className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 group cursor-pointer"
-                            onClick={() => setSelectedLead(contact)}
-                          >
-                            <div className="flex items-center gap-2">
-                              <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium">
-                                {(contact.nome || '?')[0].toUpperCase()}
-                              </div>
-                              <span className="text-sm">{contact.nome || 'Sem nome'}</span>
-                            </div>
-                          </div>
-                        ))}
-                        {selectedStage.contacts.length > 10 && (
-                          <p className="text-xs text-muted-foreground text-center py-2">
-                            + {selectedStage.contacts.length - 10} mais leads
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
             </div>
 
             {/* RIGHT: AI Assistant */}
@@ -805,29 +661,6 @@ export default function AdminEmailsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Enrollment Confirmation */}
-      <AlertDialog open={showEnrollConfirm} onOpenChange={setShowEnrollConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar inscrição na cadência</AlertDialogTitle>
-            <AlertDialogDescription>
-              Você está prestes a inscrever{' '}
-              <strong>{selectedStage?.contacts.filter(c => c.email).length || 0} contato(s)</strong>{' '}
-              com e-mail da etapa <strong>"{selectedStage?.name}"</strong> na cadência{' '}
-              <strong>"{selectedCadence?.name}"</strong>.
-              <br /><br />
-              Os e-mails serão disparados automaticamente de acordo com a programação da cadência.
-              Deseja continuar?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmEnroll}>
-              Confirmar e Inscrever
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* Rule Dialog */}
       <Dialog open={showRuleDialog} onOpenChange={setShowRuleDialog}>
