@@ -39,12 +39,7 @@ import EmailEnrollmentsTab from '@/components/email/EmailEnrollmentsTab';
 import EmailSendsTab from '@/components/email/EmailSendsTab';
 
 // ==================== TYPES ====================
-interface FunnelStage {
-  id: string;
-  name: string;
-  color: string;
-  contacts: { id: string; nome?: string; email?: string }[];
-}
+// ==================== COMPONENT ====================
 
 // ==================== COMPONENT ====================
 export default function AdminEmailsPage() {
@@ -52,8 +47,6 @@ export default function AdminEmailsPage() {
   const [cadences, setCadences] = useState<EmailCadence[]>([]);
   const [selectedCadence, setSelectedCadence] = useState<EmailCadence | null>(null);
   const [stats, setStats] = useState<SendStats>({ total: 0, sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, failed: 0 });
-  const [funnelStages, setFunnelStages] = useState<FunnelStage[]>([]);
-  const [selectedStage, setSelectedStage] = useState<FunnelStage | null>(null);
   const [loading, setLoading] = useState(true);
   const [credentialsConfigured, setCredentialsConfigured] = useState<boolean | null>(null);
 
@@ -108,58 +101,11 @@ export default function AdminEmailsPage() {
     }
   }, []);
 
-  const loadFunnelStages = useCallback(async () => {
-    try {
-      let tags: any[] = [];
-      let leadTags: any[] = [];
-      let contacts: any[] = [];
-
-      if (useBackend) {
-        const tagsRes = await apiClient.get<any>(API_ENDPOINTS.TAGS.LIST, { params: { type: 'stage', ativo: true } });
-        tags = tagsRes?.data ?? tagsRes ?? [];
-        const leadTagsRes = await apiClient.get<any>('/api/lead-tags');
-        leadTags = leadTagsRes?.data ?? leadTagsRes ?? [];
-        const contactsRes = await apiClient.get<any>(API_ENDPOINTS.CONTACTS.LIST);
-        contacts = contactsRes?.data ?? contactsRes ?? [];
-      } else {
-        const { data: tagsData } = await supabase.from('tags').select('*').eq('type', 'stage').eq('ativo', true).order('ordem');
-        tags = tagsData || [];
-        const { data: ltData } = await supabase.from('lead_tags').select('*');
-        leadTags = ltData || [];
-        const { data: cData } = await supabase.from('contacts').select('id, nome, email');
-        contacts = cData || [];
-      }
-
-      const contactMap = new Map(contacts.map((c: any) => [c.id, c]));
-
-      const stages: FunnelStage[] = tags
-        .sort((a: any, b: any) => (a.ordem ?? 0) - (b.ordem ?? 0))
-        .map((tag: any) => {
-          const tagContacts = leadTags
-            .filter((lt: any) => (lt.tag_id ?? lt.tagId) === tag.id)
-            .map((lt: any) => contactMap.get(lt.contact_id ?? lt.contactId))
-            .filter(Boolean)
-            .map((c: any) => ({ id: c.id, nome: c.nome, email: c.email }));
-          return {
-            id: tag.id,
-            name: tag.name,
-            color: tag.color || '#6366F1',
-            contacts: tagContacts,
-          };
-        });
-
-      setFunnelStages(stages);
-      if (stages.length > 0 && !selectedStage) setSelectedStage(stages[0]);
-    } catch (err) {
-      console.error('Erro ao carregar funil:', err);
-    }
-  }, []);
 
   useEffect(() => {
     checkCredentials();
     loadData();
-    loadFunnelStages();
-  }, [checkCredentials, loadData, loadFunnelStages]);
+  }, [checkCredentials, loadData]);
 
   // ==================== CADENCE CRUD ====================
   const handleSaveCadence = async () => {
@@ -260,28 +206,6 @@ export default function AdminEmailsPage() {
     toast.info('Texto aplicado ao formulário de step!');
   };
 
-  // ==================== ENROLL ====================
-  const handleEnrollStageContacts = async () => {
-    if (!selectedCadence || !selectedStage) return;
-    const contactIds = selectedStage.contacts.filter(c => c.email).map(c => c.id);
-    if (contactIds.length === 0) {
-      toast.warning('Nenhum contato com e-mail nesta etapa.');
-      return;
-    }
-    setShowEnrollConfirm(true);
-  };
-
-  const confirmEnroll = async () => {
-    if (!selectedCadence || !selectedStage) return;
-    const contactIds = selectedStage.contacts.filter(c => c.email).map(c => c.id);
-    setShowEnrollConfirm(false);
-    try {
-      await emailService.enroll(selectedCadence.id, contactIds);
-      toast.success(`${contactIds.length} contato(s) inscritos na cadência "${selectedCadence.name}"!`);
-    } catch (err: any) {
-      toast.error(err?.message || 'Erro ao inscrever contatos');
-    }
-  };
 
   // ==================== RULES ====================
   const handleSaveRule = async () => {
