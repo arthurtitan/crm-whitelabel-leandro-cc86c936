@@ -1,8 +1,8 @@
-import { Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { calendarService } from '../services/calendar.service';
 import { AuthenticatedRequest } from '../types';
-import { getPaginationParams, getDateRangeFilter } from '../utils/helpers';
+import { getPaginationParams } from '../utils/helpers';
 
 // Validation schemas
 const createEventSchema = z.object({
@@ -31,6 +31,21 @@ const listEventsSchema = z.object({
   status: z.enum(['scheduled', 'cancelled', 'completed']).optional(),
   contactId: z.string().uuid().optional(),
 });
+
+function readForwardedHeader(value: string | string[] | undefined): string {
+  if (Array.isArray(value)) return value[0] ?? '';
+  return value?.split(',')[0]?.trim() ?? '';
+}
+
+function getRequestOrigin(req: Request): string {
+  const originHeader = req.get('origin')?.trim();
+  if (originHeader) return originHeader.replace(/\/$/, '');
+
+  const proto = readForwardedHeader(req.headers['x-forwarded-proto']) || req.protocol || 'http';
+  const host = readForwardedHeader(req.headers['x-forwarded-host']) || req.get('host') || 'localhost:3000';
+
+  return `${proto}://${host}`.replace(/\/$/, '');
+}
 
 export class CalendarController {
   /**
@@ -136,7 +151,8 @@ export class CalendarController {
    */
   async connectGoogle(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      const authUrl = await calendarService.getGoogleAuthUrl(req.user!.accountId!, req.user!.id);
+      const requestOrigin = getRequestOrigin(req);
+      const authUrl = await calendarService.getGoogleAuthUrl(req.user!.accountId!, req.user!.id, requestOrigin);
 
       res.json({ data: { authUrl } });
     } catch (error) {
@@ -148,26 +164,27 @@ export class CalendarController {
    * GET /calendar/google/callback
    */
   async googleCallback(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
+    const fallbackFrontendUrl = getRequestOrigin(req);
     try {
       const { code, state, error: oauthError } = req.query;
 
       if (oauthError) {
-        res.redirect(`${frontendUrl}/admin/agenda?google_error=${encodeURIComponent(oauthError as string)}`);
+        res.redirect(`${fallbackFrontendUrl}/admin/agenda?google_error=${encodeURIComponent(oauthError as string)}`);
         return;
       }
 
       if (!code || !state) {
-        res.redirect(`${frontendUrl}/admin/agenda?google_error=missing_params`);
+        res.redirect(`${fallbackFrontendUrl}/admin/agenda?google_error=missing_params`);
         return;
       }
 
-      await calendarService.handleGoogleCallback(code as string, state as string);
+      const result = await calendarService.handleGoogleCallback(code as string, state as string);
+      const frontendUrl = (result.origin || fallbackFrontendUrl).replace(/\/$/, '');
 
       res.redirect(`${frontendUrl}/admin/agenda?google_connected=true`);
     } catch (error: any) {
       console.error('Google OAuth callback error:', error);
-      res.redirect(`${frontendUrl}/admin/agenda?google_error=${encodeURIComponent(error.message || 'unknown')}`);
+      res.redirect(`${fallbackFrontendUrl}/admin/agenda?google_error=${encodeURIComponent(error.message || 'unknown')}`);
     }
   }
 

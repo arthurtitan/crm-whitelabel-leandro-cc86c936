@@ -51,6 +51,12 @@ interface GoogleCredentialResolution {
   source: GoogleCredentialSource;
 }
 
+interface GoogleOAuthState {
+  accountId: string;
+  userId: string;
+  origin?: string;
+}
+
 class CalendarService {
   /**
    * Build a safe redirect URI when the account does not have one stored yet.
@@ -135,6 +141,26 @@ class CalendarService {
       missing: [],
       source,
     };
+  }
+
+  private buildProductionRedirectUri(requestOrigin?: string): string | null {
+    const normalizedOrigin = (requestOrigin || '').trim().replace(/\/$/, '');
+    if (!normalizedOrigin) return null;
+    return `${normalizedOrigin}/api/calendar/google/callback`;
+  }
+
+  private encodeOAuthState(payload: GoogleOAuthState): string {
+    return Buffer.from(JSON.stringify(payload)).toString('base64');
+  }
+
+  private decodeOAuthState(stateBase64: string): GoogleOAuthState {
+    try {
+      const decoded = JSON.parse(Buffer.from(stateBase64, 'base64').toString('utf-8')) as GoogleOAuthState;
+      if (!decoded.accountId || !decoded.userId) throw new Error('Missing fields');
+      return decoded;
+    } catch {
+      throw new AppError('State OAuth inválido', 400, 'INVALID_STATE');
+    }
   }
 
   /**
@@ -261,7 +287,7 @@ class CalendarService {
   /**
    * Get Google OAuth URL — credentials from DB
    */
-  async getGoogleAuthUrl(accountId: string, userId: string): Promise<string> {
+  async getGoogleAuthUrl(accountId: string, userId: string, requestOrigin?: string): Promise<string> {
     const creds = await this.getGoogleCredentials(accountId);
     if (!creds) {
       throw new AppError(
@@ -272,16 +298,20 @@ class CalendarService {
     }
 
     const scopes = ['https://www.googleapis.com/auth/calendar.readonly'];
-    const statePayload = Buffer.from(JSON.stringify({ accountId, userId })).toString('base64');
+    const productionRedirectUri = this.buildProductionRedirectUri(requestOrigin);
+    const redirectUri = productionRedirectUri || creds.redirectUri;
+    const statePayload = this.encodeOAuthState({ accountId, userId, origin: requestOrigin });
     const params = new URLSearchParams({
       client_id: creds.clientId,
-      redirect_uri: creds.redirectUri,
+      redirect_uri: redirectUri,
       response_type: 'code',
       scope: scopes.join(' '),
       access_type: 'offline',
       prompt: 'consent',
       state: statePayload,
     });
+
+    console.log(`[GoogleCal] Auth URL generated for account ${accountId} using redirect ${redirectUri}`);
 
     return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
   }
@@ -290,22 +320,16 @@ class CalendarService {
    * Handle Google OAuth callback — credentials from DB
    */
   async handleGoogleCallback(code: string, stateBase64: string) {
-    // Decode state to extract accountId and userId
-    let accountId: string;
-    let userId: string;
-    try {
-      const decoded = JSON.parse(Buffer.from(stateBase64, 'base64').toString('utf-8'));
-      accountId = decoded.accountId;
-      userId = decoded.userId;
-      if (!accountId || !userId) throw new Error('Missing fields');
-    } catch {
-      throw new AppError('State OAuth inválido', 400, 'INVALID_STATE');
-    }
+    const decodedState = this.decodeOAuthState(stateBase64);
+    const { accountId, userId, origin } = decodedState;
 
     const creds = await this.getGoogleCredentials(accountId);
     if (!creds) {
       throw new AppError('Google Calendar não configurado para esta conta.', 422, 'GOOGLE_NOT_CONFIGURED');
     }
+
+    const productionRedirectUri = this.buildProductionRedirectUri(origin);
+    const redirectUri = productionRedirectUri || creds.redirectUri;
 
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
@@ -315,7 +339,7 @@ class CalendarService {
         client_secret: creds.clientSecret,
         code,
         grant_type: 'authorization_code',
-        redirect_uri: creds.redirectUri,
+        redirect_uri: redirectUri,
       }),
     });
 
@@ -350,7 +374,7 @@ class CalendarService {
       },
     });
 
-    return { success: true, email: userInfo.email };
+    return { success: true, email: userInfo.email, origin: origin || null };
   }
 
   /**
