@@ -94,6 +94,12 @@ interface CreateFormData {
   chatwootBaseUrl: string;
   chatwootAccountId: string;
   chatwootApiKey: string;
+  openaiEnabled: boolean;
+  openaiApiKey: string;
+  sendgridEnabled: boolean;
+  sendgridApiKey: string;
+  sendgridFromEmail: string;
+  sendgridFromName: string;
 }
 
 const initialFormData: CreateFormData = {
@@ -105,6 +111,12 @@ const initialFormData: CreateFormData = {
   chatwootBaseUrl: 'https://app.chatwoot.com',
   chatwootAccountId: '',
   chatwootApiKey: '',
+  openaiEnabled: false,
+  openaiApiKey: '',
+  sendgridEnabled: false,
+  sendgridApiKey: '',
+  sendgridFromEmail: '',
+  sendgridFromName: '',
 };
 
 export default function SuperAdminAccountsPage() {
