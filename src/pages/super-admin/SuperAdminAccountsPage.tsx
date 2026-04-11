@@ -687,6 +687,88 @@ export default function SuperAdminAccountsPage() {
                       </div>
                     )}
                   </div>
+
+                  {/* OpenAI Integration */}
+                  <div className="space-y-4 rounded-lg border p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="create-openai-toggle" className="text-sm font-medium">
+                          Integração OpenAI
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          Assistente de IA para geração de e-mails
+                        </p>
+                      </div>
+                      <Switch
+                        id="create-openai-toggle"
+                        checked={formData.openaiEnabled}
+                        onCheckedChange={(checked) => setFormData({ ...formData, openaiEnabled: checked })}
+                      />
+                    </div>
+                    {formData.openaiEnabled && (
+                      <div className="space-y-2">
+                        <Label htmlFor="create-openai-key">API Key</Label>
+                        <Input
+                          id="create-openai-key"
+                          type="password"
+                          value={formData.openaiApiKey}
+                          onChange={(e) => setFormData({ ...formData, openaiApiKey: e.target.value })}
+                          placeholder="sk-..."
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* SendGrid Integration */}
+                  <div className="space-y-4 rounded-lg border p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="create-sendgrid-toggle" className="text-sm font-medium">
+                          Integração E-mail de Saída
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          Disparo de e-mails com rastreamento
+                        </p>
+                      </div>
+                      <Switch
+                        id="create-sendgrid-toggle"
+                        checked={formData.sendgridEnabled}
+                        onCheckedChange={(checked) => setFormData({ ...formData, sendgridEnabled: checked })}
+                      />
+                    </div>
+                    {formData.sendgridEnabled && (
+                      <div className="space-y-3">
+                        <div className="space-y-2">
+                          <Label htmlFor="create-sendgrid-key">API Key</Label>
+                          <Input
+                            id="create-sendgrid-key"
+                            type="password"
+                            value={formData.sendgridApiKey}
+                            onChange={(e) => setFormData({ ...formData, sendgridApiKey: e.target.value })}
+                            placeholder="SG...."
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="create-sendgrid-email">E-mail Remetente</Label>
+                          <Input
+                            id="create-sendgrid-email"
+                            value={formData.sendgridFromEmail}
+                            onChange={(e) => setFormData({ ...formData, sendgridFromEmail: e.target.value })}
+                            placeholder="contato@empresa.com"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="create-sendgrid-name">Nome Remetente</Label>
+                          <Input
+                            id="create-sendgrid-name"
+                            value={formData.sendgridFromName}
+                            onChange={(e) => setFormData({ ...formData, sendgridFromName: e.target.value })}
+                            placeholder="Minha Empresa"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <DialogFooter className="flex-shrink-0 gap-3">
