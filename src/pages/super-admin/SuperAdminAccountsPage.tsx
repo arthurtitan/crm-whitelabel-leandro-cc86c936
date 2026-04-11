@@ -1135,6 +1135,58 @@ export default function SuperAdminAccountsPage() {
                   </p>
                 )}
               </div>
+
+              {/* OpenAI Integration */}
+              <div className="space-y-4 rounded-lg border p-4">
+                <h4 className="text-sm font-medium">Integração OpenAI</h4>
+                <p className="text-xs text-muted-foreground">Assistente de IA para geração de e-mails</p>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-openai-key">API Key</Label>
+                  <Input
+                    id="edit-openai-key"
+                    type="password"
+                    value={(editingAccount as any)?.openai_api_key || ''}
+                    onChange={(e) => setEditingAccount({ ...editingAccount!, openai_api_key: e.target.value } as any)}
+                    placeholder="sk-..."
+                  />
+                </div>
+              </div>
+
+              {/* SendGrid Integration */}
+              <div className="space-y-4 rounded-lg border p-4">
+                <h4 className="text-sm font-medium">E-mail de Saída</h4>
+                <p className="text-xs text-muted-foreground">Disparo de e-mails com rastreamento</p>
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-sendgrid-key">API Key</Label>
+                    <Input
+                      id="edit-sendgrid-key"
+                      type="password"
+                      value={(editingAccount as any)?.sendgrid_api_key || ''}
+                      onChange={(e) => setEditingAccount({ ...editingAccount!, sendgrid_api_key: e.target.value } as any)}
+                      placeholder="SG...."
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-sendgrid-email">E-mail Remetente</Label>
+                    <Input
+                      id="edit-sendgrid-email"
+                      value={(editingAccount as any)?.sendgrid_from_email || ''}
+                      onChange={(e) => setEditingAccount({ ...editingAccount!, sendgrid_from_email: e.target.value } as any)}
+                      placeholder="contato@empresa.com"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-sendgrid-name">Nome Remetente</Label>
+                    <Input
+                      id="edit-sendgrid-name"
+                      value={(editingAccount as any)?.sendgrid_from_name || ''}
+                      onChange={(e) => setEditingAccount({ ...editingAccount!, sendgrid_from_name: e.target.value } as any)}
+                      placeholder="Minha Empresa"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           )}
           <DialogFooter className="flex-shrink-0 gap-3">
