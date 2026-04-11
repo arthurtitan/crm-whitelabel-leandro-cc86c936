@@ -166,7 +166,12 @@ export default function SuperAdminAccountsPage() {
   };
 
   const filteredAccounts = accounts.filter((account) => {
-    const matchesSearch = account.nome.toLowerCase().includes(searchTerm.toLowerCase());
+    const term = searchTerm.toLowerCase();
+    const matchesSearch = !term || 
+      account.nome.toLowerCase().includes(term) ||
+      account.id.toLowerCase().includes(term) ||
+      (account.plano || '').toLowerCase().includes(term) ||
+      (account.chatwoot_base_url || '').toLowerCase().includes(term);
     if (statusFilter === 'all') {
       return matchesSearch && account.status !== 'cancelled';
     }
