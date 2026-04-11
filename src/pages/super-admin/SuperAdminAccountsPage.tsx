@@ -231,6 +231,10 @@ export default function SuperAdminAccountsPage() {
         chatwoot_base_url: formData.chatwootEnabled ? formData.chatwootBaseUrl : undefined,
         chatwoot_account_id: formData.chatwootEnabled ? formData.chatwootAccountId : undefined,
         chatwoot_api_key: formData.chatwootEnabled ? formData.chatwootApiKey : undefined,
+        openai_api_key: formData.openaiEnabled ? formData.openaiApiKey : undefined,
+        sendgrid_api_key: formData.sendgridEnabled ? formData.sendgridApiKey : undefined,
+        sendgrid_from_email: formData.sendgridEnabled ? formData.sendgridFromEmail : undefined,
+        sendgrid_from_name: formData.sendgridEnabled ? formData.sendgridFromName : undefined,
       });
       
       setCreatedAccountId(newAccount.id);
@@ -268,6 +272,10 @@ export default function SuperAdminAccountsPage() {
         chatwoot_base_url: formData.chatwootEnabled ? formData.chatwootBaseUrl : undefined,
         chatwoot_account_id: formData.chatwootEnabled ? formData.chatwootAccountId : undefined,
         chatwoot_api_key: formData.chatwootEnabled ? formData.chatwootApiKey : undefined,
+        openai_api_key: formData.openaiEnabled ? formData.openaiApiKey : undefined,
+        sendgrid_api_key: formData.sendgridEnabled ? formData.sendgridApiKey : undefined,
+        sendgrid_from_email: formData.sendgridEnabled ? formData.sendgridFromEmail : undefined,
+        sendgrid_from_name: formData.sendgridEnabled ? formData.sendgridFromName : undefined,
       });
       
       await loadAccounts();
@@ -392,6 +400,10 @@ export default function SuperAdminAccountsPage() {
         chatwoot_base_url: editingAccount.chatwoot_base_url,
         chatwoot_account_id: editingAccount.chatwoot_account_id,
         chatwoot_api_key: editingAccount.chatwoot_api_key,
+        openai_api_key: (editingAccount as any).openai_api_key,
+        sendgrid_api_key: (editingAccount as any).sendgrid_api_key,
+        sendgrid_from_email: (editingAccount as any).sendgrid_from_email,
+        sendgrid_from_name: (editingAccount as any).sendgrid_from_name,
       });
       
       await loadAccounts();
