@@ -125,6 +125,10 @@ export const accountsCloudService = {
         chatwoot_base_url: input.chatwoot_base_url,
         chatwoot_account_id: input.chatwoot_account_id,
         chatwoot_api_key: input.chatwoot_api_key,
+        openai_api_key: input.openai_api_key,
+        sendgrid_api_key: input.sendgrid_api_key,
+        sendgrid_from_email: input.sendgrid_from_email,
+        sendgrid_from_name: input.sendgrid_from_name,
       })
       .select()
       .single();
