@@ -270,7 +270,7 @@ export const emailService = {
     const firstStep = cadence.steps[0];
     const timezone = cadence.account?.timezone || 'America/Sao_Paulo';
     const nextSendAt = firstStep
-      ? calculateNextSendAt(firstStep.dayNumber, cadence.sendAtTime, timezone)
+      ? calculateNextSendAt(firstStep.dayNumber, cadence.sendAtTime, timezone, cadence.startDate)
       : null;
 
     const enrollments = await Promise.all(
