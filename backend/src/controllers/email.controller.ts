@@ -239,6 +239,12 @@ export const emailController = {
 
   async processQueue(req: Request, res: Response, next: NextFunction) {
     try {
+      const accountId = getAccountId(req);
+      // Force: set all active enrollments' nextSendAt to now so they get picked up
+      await prisma.emailEnrollment.updateMany({
+        where: { accountId, status: 'active', nextSendAt: { not: null } },
+        data: { nextSendAt: new Date() },
+      });
       const processed = await emailService.processCadenceQueue();
       res.json({ success: true, processed });
     } catch (error) { next(error); }
