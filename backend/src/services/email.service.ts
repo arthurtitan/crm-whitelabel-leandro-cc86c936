@@ -153,6 +153,7 @@ export const emailService = {
     triggerEvent: string;
     targetCadenceId: string;
     delayHours?: number;
+    timeoutHours?: number;
   }) {
     return prisma.emailCadenceRule.create({
       data: {
@@ -160,6 +161,7 @@ export const emailService = {
         triggerEvent: data.triggerEvent,
         targetCadenceId: data.targetCadenceId,
         delayHours: data.delayHours || 0,
+        timeoutHours: data.timeoutHours || 48,
       },
       include: { targetCadence: { select: { id: true, name: true } } },
     });
@@ -169,6 +171,7 @@ export const emailService = {
     triggerEvent?: string;
     targetCadenceId?: string;
     delayHours?: number;
+    timeoutHours?: number;
     active?: boolean;
   }) {
     return prisma.emailCadenceRule.update({
@@ -518,26 +521,22 @@ export const emailService = {
       }
     }
 
-    // Process branching rules based on webhook events
-    await this.processBranchingRules();
+    // Process not_opened timeout rules during cron cycle
+    await this.processNotOpenedRules();
 
     return totalProcessed;
   },
 
-  // ==================== BRANCHING RULES PROCESSOR ====================
+  // ==================== BRANCHING: REAL-TIME (called from webhook) ====================
 
-  async processBranchingRules() {
+  /**
+   * Evaluate branching rules for a specific email send event in real-time.
+   * Called directly from the SendGrid webhook handler.
+   */
+  async evaluateRulesForSend(sendId: string, triggerEvent: 'opened' | 'clicked' | 'bounced') {
     try {
-      // Find recently completed/updated sends with events
-      const recentSends = await prisma.emailSend.findMany({
-        where: {
-          OR: [
-            { status: 'opened', openedAt: { gte: new Date(Date.now() - 10 * 60 * 1000) } },
-            { status: 'clicked', clickedAt: { gte: new Date(Date.now() - 10 * 60 * 1000) } },
-            { status: 'bounced', bouncedAt: { gte: new Date(Date.now() - 10 * 60 * 1000) } },
-          ],
-          enrollmentId: { not: null },
-        },
+      const send = await prisma.emailSend.findUnique({
+        where: { id: sendId },
         include: {
           enrollment: {
             include: {
@@ -547,59 +546,137 @@ export const emailService = {
             },
           },
         },
-        take: 100,
       });
 
-      for (const send of recentSends) {
-        if (!send.enrollment?.cadence?.rulesFrom?.length) continue;
+      if (!send?.enrollment?.cadence?.rulesFrom?.length) return;
 
-        // Map send status to trigger event
-        let triggerEvent: string | null = null;
-        if (send.status === 'clicked') triggerEvent = 'clicked';
-        else if (send.status === 'opened') triggerEvent = 'opened';
-        else if (send.status === 'bounced') triggerEvent = 'bounced';
+      const matchingRule = send.enrollment.cadence.rulesFrom.find(
+        r => r.triggerEvent === triggerEvent
+      );
 
-        if (!triggerEvent) continue;
+      if (!matchingRule) return;
 
-        // Find matching rule (priority: clicked > opened > bounced)
-        const matchingRule = send.enrollment.cadence.rulesFrom.find(
-          r => r.triggerEvent === triggerEvent
-        );
+      await this.applyBranchingRule(matchingRule, send.enrollment, send.accountId);
+    } catch (error: any) {
+      logger.error(`[Branching RT] Error evaluating rules for send ${sendId}: ${error.message}`);
+    }
+  },
 
-        if (!matchingRule) continue;
+  /**
+   * Apply a branching rule: complete current enrollment and create new one with proper delay.
+   */
+  async applyBranchingRule(
+    rule: { targetCadenceId: string; delayHours: number; triggerEvent: string },
+    enrollment: { id: string; contactId: string },
+    accountId: string
+  ) {
+    // Check if already enrolled in target cadence
+    const existing = await prisma.emailEnrollment.findFirst({
+      where: {
+        cadenceId: rule.targetCadenceId,
+        contactId: enrollment.contactId,
+        status: 'active',
+      },
+    });
 
-        // Check if already enrolled in target cadence
-        const existingEnrollment = await prisma.emailEnrollment.findFirst({
+    if (existing) return;
+
+    // Complete current enrollment
+    await prisma.emailEnrollment.update({
+      where: { id: enrollment.id },
+      data: { status: 'completed', completedAt: new Date() },
+    });
+
+    // Calculate proper nextSendAt using target cadence's settings + delay_hours
+    const targetCadence = await prisma.emailCadence.findUnique({
+      where: { id: rule.targetCadenceId },
+      include: {
+        steps: { orderBy: { ordem: 'asc' }, take: 1 },
+        account: { select: { timezone: true } },
+      },
+    });
+
+    let nextSendAt: Date;
+    if (rule.delayHours > 0) {
+      // Apply delay_hours from now
+      nextSendAt = new Date(Date.now() + rule.delayHours * 60 * 60 * 1000);
+    } else if (targetCadence?.steps[0]) {
+      // No delay: schedule based on target cadence's first step timing
+      const timezone = targetCadence.account?.timezone || 'America/Sao_Paulo';
+      nextSendAt = calculateNextSendAt(
+        targetCadence.steps[0].dayNumber,
+        targetCadence.sendAtTime,
+        timezone,
+        targetCadence.startDate
+      );
+      // If calculated time is in the past, send now
+      if (nextSendAt < new Date()) nextSendAt = new Date();
+    } else {
+      nextSendAt = new Date();
+    }
+
+    await prisma.emailEnrollment.create({
+      data: {
+        accountId,
+        cadenceId: rule.targetCadenceId,
+        contactId: enrollment.contactId,
+        nextSendAt,
+      },
+    });
+
+    logger.info(`[Branching] Contact ${enrollment.contactId} → cadence ${rule.targetCadenceId} (trigger: ${rule.triggerEvent}, delay: ${rule.delayHours}h)`);
+  },
+
+  // ==================== BRANCHING: NOT_OPENED TIMEOUT (called from cron) ====================
+
+  /**
+   * Process not_opened rules: check sends that were sent X hours ago
+   * and were never opened. Runs during the cron cycle.
+   */
+  async processNotOpenedRules() {
+    try {
+      // Find all active not_opened rules
+      const notOpenedRules = await prisma.emailCadenceRule.findMany({
+        where: { triggerEvent: 'not_opened', active: true },
+        include: {
+          cadence: { select: { id: true, accountId: true } },
+        },
+      });
+
+      for (const rule of notOpenedRules) {
+        const timeoutMs = (rule.timeoutHours || 48) * 60 * 60 * 1000;
+        const cutoffDate = new Date(Date.now() - timeoutMs);
+
+        // Find sends from this cadence that were sent before cutoff and never opened
+        const unopenedSends = await prisma.emailSend.findMany({
           where: {
-            cadenceId: matchingRule.targetCadenceId,
-            contactId: send.enrollment.contactId,
-            status: 'active',
+            status: { in: ['sent', 'delivered'] },
+            sentAt: { lte: cutoffDate },
+            openedAt: null,
+            clickedAt: null,
+            enrollmentId: { not: null },
+            enrollment: {
+              cadenceId: rule.cadenceId,
+              status: 'active',
+            },
           },
-        });
-
-        if (existingEnrollment) continue;
-
-        // Complete current enrollment
-        await prisma.emailEnrollment.update({
-          where: { id: send.enrollmentId! },
-          data: { status: 'completed', completedAt: new Date() },
-        });
-
-        // Create new enrollment in target cadence
-        const delayMs = matchingRule.delayHours * 60 * 60 * 1000;
-        await prisma.emailEnrollment.create({
-          data: {
-            accountId: send.accountId,
-            cadenceId: matchingRule.targetCadenceId,
-            contactId: send.enrollment.contactId,
-            nextSendAt: new Date(Date.now() + delayMs),
+          include: {
+            enrollment: true,
           },
+          take: 50,
         });
 
-        logger.info(`[Branching] Contact ${send.enrollment.contactId} moved to cadence ${matchingRule.targetCadenceId} (trigger: ${triggerEvent})`);
+        for (const send of unopenedSends) {
+          if (!send.enrollment) continue;
+          await this.applyBranchingRule(rule, send.enrollment, send.accountId);
+        }
+
+        if (unopenedSends.length > 0) {
+          logger.info(`[Branching] Processed ${unopenedSends.length} not_opened sends for cadence ${rule.cadenceId} (timeout: ${rule.timeoutHours}h)`);
+        }
       }
     } catch (error: any) {
-      logger.error(`[Branching] Error processing rules: ${error.message}`);
+      logger.error(`[Branching] Error processing not_opened rules: ${error.message}`);
     }
   },
 };

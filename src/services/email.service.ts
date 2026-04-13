@@ -25,9 +25,10 @@ export interface EmailCadenceStep {
 export interface EmailCadenceRule {
   id: string;
   cadence_id: string;
-  trigger_event: 'opened' | 'clicked' | 'replied' | 'not_opened' | 'bounced';
+  trigger_event: 'opened' | 'clicked' | 'not_opened' | 'bounced';
   target_cadence_id: string;
   delay_hours: number;
+  timeout_hours?: number;
   active: boolean;
   created_at: string;
   updated_at: string;
@@ -330,7 +331,7 @@ export const emailApiService = {
     return (unwrap<any[]>(res) || []).map(mapRule);
   },
 
-  async createRule(cadenceId: string, data: { triggerEvent: string; targetCadenceId: string; delayHours?: number }): Promise<EmailCadenceRule> {
+  async createRule(cadenceId: string, data: { triggerEvent: string; targetCadenceId: string; delayHours?: number; timeoutHours?: number }): Promise<EmailCadenceRule> {
     const res = await apiClient.post<any>(API_ENDPOINTS.EMAIL.CADENCE_RULES(cadenceId), data);
     return mapRule(unwrap(res));
   },

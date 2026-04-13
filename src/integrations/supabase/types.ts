@@ -360,6 +360,7 @@ export type Database = {
           delay_hours: number
           id: string
           target_cadence_id: string
+          timeout_hours: number | null
           trigger_event: string
           updated_at: string
         }
@@ -370,6 +371,7 @@ export type Database = {
           delay_hours?: number
           id?: string
           target_cadence_id: string
+          timeout_hours?: number | null
           trigger_event: string
           updated_at?: string
         }
@@ -380,6 +382,7 @@ export type Database = {
           delay_hours?: number
           id?: string
           target_cadence_id?: string
+          timeout_hours?: number | null
           trigger_event?: string
           updated_at?: string
         }

@@ -680,6 +680,7 @@ model EmailCadenceRule {
   triggerEvent    String  @map("trigger_event") @db.VarChar(50)
   targetCadenceId String  @map("target_cadence_id") @db.Uuid
   delayHours      Int     @default(0) @map("delay_hours")
+  timeoutHours    Int     @default(48) @map("timeout_hours")
   active          Boolean @default(true)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
