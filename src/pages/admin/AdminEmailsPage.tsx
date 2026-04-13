@@ -237,6 +237,24 @@ export default function AdminEmailsPage() {
     }
   };
 
+  // ==================== PROCESS QUEUE ====================
+  const handleProcessQueue = async () => {
+    setProcessingQueue(true);
+    try {
+      const result = await emailService.processQueue();
+      if (result.processed > 0) {
+        toast.success(`${result.processed} e-mail(s) processado(s) com sucesso!`);
+      } else {
+        toast.info('Nenhum e-mail pendente na fila.');
+      }
+      await loadData();
+    } catch (err: any) {
+      toast.error(err?.message || 'Erro ao processar fila de e-mails');
+    } finally {
+      setProcessingQueue(false);
+    }
+  };
+
   const triggerEventLabels: Record<string, string> = {
     opened: '📬 Abriu o e-mail',
     clicked: '🖱️ Clicou no link',
