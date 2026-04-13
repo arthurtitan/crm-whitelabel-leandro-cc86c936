@@ -128,6 +128,55 @@ export default function EmailEnrollmentsTab() {
     loadContacts(contactSearch);
   };
 
+  const handleCreateContactByEmail = async () => {
+    const email = contactSearch.trim().toLowerCase();
+    if (!isValidEmail(email)) {
+      toast.error('Digite um e-mail válido');
+      return;
+    }
+    setCreatingContact(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Não autenticado');
+      const { data: profile } = await supabase.from('profiles').select('account_id').eq('user_id', user.id).single();
+      if (!profile?.account_id) throw new Error('Conta não encontrada');
+
+      // Check if already exists
+      const { data: existing } = await supabase
+        .from('contacts')
+        .select('id, nome, email')
+        .eq('account_id', profile.account_id)
+        .eq('email', email)
+        .maybeSingle();
+
+      if (existing) {
+        setContacts([{ id: existing.id, nome: existing.nome, email: existing.email }]);
+        setSelectedContactIds([existing.id]);
+        toast.info('Contato já existe, selecionado automaticamente.');
+      } else {
+        const { data: newContact, error } = await supabase
+          .from('contacts')
+          .insert({
+            account_id: profile.account_id,
+            nome: email.split('@')[0],
+            email,
+          })
+          .select('id, nome, email')
+          .single();
+
+        if (error) throw error;
+        setContacts([{ id: newContact.id, nome: newContact.nome, email: newContact.email }]);
+        setSelectedContactIds([newContact.id]);
+        toast.success('Contato criado e selecionado!');
+      }
+    } catch (err: any) {
+      console.error('Erro ao criar contato:', err);
+      toast.error(err?.message || 'Erro ao criar contato');
+    } finally {
+      setCreatingContact(false);
+    }
+  };
+
   const toggleContact = (id: string) => {
     setSelectedContactIds(prev =>
       prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
