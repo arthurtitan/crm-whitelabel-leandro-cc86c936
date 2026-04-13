@@ -215,7 +215,7 @@ export default function AdminEmailsPage() {
       await emailService.createRule(selectedCadence.id, ruleForm);
       toast.success('Regra de ramificação criada!');
       setShowRuleDialog(false);
-      setRuleForm({ triggerEvent: 'opened', targetCadenceId: '', delayHours: 0 });
+      setRuleForm({ triggerEvent: 'opened', targetCadenceId: '', delayHours: 0, timeoutHours: 48 });
       const updated = await emailService.getCadence(selectedCadence.id);
       setSelectedCadence(updated);
       setCadences(prev => prev.map(c => c.id === updated.id ? updated : c));
@@ -500,7 +500,7 @@ export default function AdminEmailsPage() {
                         Regras de Ramificação
                       </CardTitle>
                       <Button variant="ghost" size="sm" onClick={() => {
-                        setRuleForm({ triggerEvent: 'opened', targetCadenceId: '', delayHours: 0 });
+                        setRuleForm({ triggerEvent: 'opened', targetCadenceId: '', delayHours: 0, timeoutHours: 48 });
                         setShowRuleDialog(true);
                       }}>
                         <Plus className="w-4 h-4 mr-1" /> Nova Regra
