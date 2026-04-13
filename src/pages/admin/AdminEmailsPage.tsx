@@ -289,14 +289,15 @@ export default function AdminEmailsPage() {
           variant="outline"
           size="sm"
           onClick={handleProcessQueue}
-          disabled={processingQueue}
+          disabled={processingQueue || !selectedCadence}
+          title={selectedCadence ? `Disparar e-mails da cadência "${selectedCadence.name}"` : 'Selecione uma cadência primeiro'}
         >
           {processingQueue ? (
             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
           ) : (
-            <RefreshCw className="w-4 h-4 mr-2" />
+            <Send className="w-4 h-4 mr-2" />
           )}
-          Disparar agora
+          {selectedCadence ? `Disparar "${selectedCadence.name}"` : 'Disparar agora'}
         </Button>
       </div>
 
