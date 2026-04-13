@@ -3,6 +3,16 @@ import { logger } from '../utils/logger';
 
 const prisma = new PrismaClient();
 
+// Lazy import to avoid circular dependency
+let _emailService: any = null;
+async function getEmailService() {
+  if (!_emailService) {
+    const mod = await import('./email.service');
+    _emailService = mod.emailService;
+  }
+  return _emailService;
+}
+
 interface SendEmailParams {
   to: string;
   subject: string;
@@ -185,6 +195,16 @@ export const sendgridService = {
           where: { id: emailSend.id },
           data: updateData,
         });
+
+        // Real-time branching: evaluate rules immediately for actionable events
+        if (['opened', 'clicked', 'bounced'].includes(updateData.status)) {
+          try {
+            const es = await getEmailService();
+            await es.evaluateRulesForSend(emailSend.id, updateData.status as 'opened' | 'clicked' | 'bounced');
+          } catch (branchErr: any) {
+            logger.error(`[SendGrid Webhook] Branching error: ${branchErr.message}`);
+          }
+        }
 
         // If bounced, update enrollment too
         if (updateData.status === 'bounced' && emailSend.enrollmentId) {
