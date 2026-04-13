@@ -98,6 +98,8 @@ export const emailService = {
     description?: string;
     targetStageIds?: string[];
     createdBy?: string;
+    sendAtTime?: string;
+    startDate?: string;
   }) {
     return prisma.emailCadence.create({
       data: {
@@ -106,6 +108,8 @@ export const emailService = {
         description: data.description,
         targetStageIds: data.targetStageIds || [],
         createdBy: data.createdBy,
+        sendAtTime: data.sendAtTime || '09:00',
+        startDate: data.startDate ? new Date(data.startDate) : new Date(),
       },
       include: { steps: true },
     });
