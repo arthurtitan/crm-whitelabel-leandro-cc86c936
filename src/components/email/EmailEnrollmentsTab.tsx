@@ -202,8 +202,6 @@ export default function EmailEnrollmentsTab() {
 
   // ==================== SPREADSHEET IMPORT ====================
 
-  const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
