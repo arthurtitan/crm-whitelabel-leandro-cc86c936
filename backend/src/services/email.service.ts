@@ -500,6 +500,7 @@ export const emailService = {
             const nextStepIndex = enrollment.currentStep + 1;
             const nextStep = steps[nextStepIndex];
 
+            if (nextStep) {
               const timezone = (await prisma.account.findUnique({ where: { id: enrollment.accountId }, select: { timezone: true } }))?.timezone || 'America/Sao_Paulo';
               const nextSendAt = calculateNextSendAt(nextStep.dayNumber, enrollment.cadence.sendAtTime, timezone);
               await prisma.emailEnrollment.update({
