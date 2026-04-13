@@ -281,6 +281,19 @@ export default function AdminEmailsPage() {
           <h1 className="text-2xl font-bold text-foreground">E-mails</h1>
           <p className="text-muted-foreground">Automação de e-mails com cadências inteligentes</p>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleProcessQueue}
+          disabled={processingQueue}
+        >
+          {processingQueue ? (
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          ) : (
+            <RefreshCw className="w-4 h-4 mr-2" />
+          )}
+          Disparar agora
+        </Button>
       </div>
 
       {/* Credentials Warning (white-label) */}
