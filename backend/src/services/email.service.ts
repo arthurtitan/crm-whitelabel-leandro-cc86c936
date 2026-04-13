@@ -440,7 +440,8 @@ export const emailService = {
             const nextStep = steps[nextStepIndex];
 
             if (nextStep) {
-              const nextSendAt = new Date(now.getTime() + nextStep.dayNumber * 24 * 60 * 60 * 1000);
+              const daysDiff = Math.max(0, nextStep.dayNumber - currentStep.dayNumber);
+              const nextSendAt = new Date(now.getTime() + daysDiff * 24 * 60 * 60 * 1000);
               await prisma.emailEnrollment.update({
                 where: { id: enrollment.id },
                 data: { currentStep: nextStepIndex, nextSendAt },
