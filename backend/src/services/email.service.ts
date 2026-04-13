@@ -120,10 +120,16 @@ export const emailService = {
     description?: string;
     targetStageIds?: string[];
     active?: boolean;
+    sendAtTime?: string;
+    startDate?: string;
   }) {
+    const updateData: any = { ...data };
+    if (data.startDate) {
+      updateData.startDate = new Date(data.startDate);
+    }
     return prisma.emailCadence.update({
       where: { id },
-      data,
+      data: updateData,
       include: { steps: { orderBy: { ordem: 'asc' } } },
     });
   },
