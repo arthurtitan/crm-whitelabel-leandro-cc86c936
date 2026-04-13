@@ -644,6 +644,15 @@ export default function AdminEmailsPage() {
                 rows={3}
               />
             </div>
+            <div>
+              <label className="text-sm font-medium">Horário de disparo</label>
+              <Input
+                type="time"
+                value={cadenceForm.sendAtTime}
+                onChange={(e) => setCadenceForm(prev => ({ ...prev, sendAtTime: e.target.value }))}
+              />
+              <p className="text-xs text-muted-foreground mt-1">Os e-mails serão enviados neste horário todos os dias</p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCadenceDialog(false)}>Cancelar</Button>
