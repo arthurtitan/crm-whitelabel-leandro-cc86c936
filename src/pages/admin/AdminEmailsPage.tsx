@@ -49,6 +49,7 @@ export default function AdminEmailsPage() {
   const [stats, setStats] = useState<SendStats>({ total: 0, sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, failed: 0 });
   const [loading, setLoading] = useState(true);
   const [credentialsConfigured, setCredentialsConfigured] = useState<boolean | null>(null);
+  const [processingQueue, setProcessingQueue] = useState(false);
 
   // Dialogs
   const [showCadenceDialog, setShowCadenceDialog] = useState(false);
