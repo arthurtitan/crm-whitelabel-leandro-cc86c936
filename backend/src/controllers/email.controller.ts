@@ -240,9 +240,16 @@ export const emailController = {
   async processQueue(req: Request, res: Response, next: NextFunction) {
     try {
       const accountId = getAccountId(req);
-      // Force: set all active enrollments' nextSendAt to now so they get picked up
+      const cadenceId = req.body.cadenceId as string | undefined;
+
+      // If a specific cadence is targeted, only force those enrollments
+      const whereClause: any = { accountId, status: 'active', nextSendAt: { not: null } };
+      if (cadenceId) {
+        whereClause.cadenceId = cadenceId;
+      }
+
       await prisma.emailEnrollment.updateMany({
-        where: { accountId, status: 'active', nextSendAt: { not: null } },
+        where: whereClause,
         data: { nextSendAt: new Date() },
       });
       const processed = await emailService.processCadenceQueue();
