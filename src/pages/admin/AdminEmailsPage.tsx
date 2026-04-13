@@ -652,14 +652,25 @@ export default function AdminEmailsPage() {
                 rows={3}
               />
             </div>
-            <div>
-              <label className="text-sm font-medium">Horário de disparo</label>
-              <Input
-                type="time"
-                value={cadenceForm.sendAtTime}
-                onChange={(e) => setCadenceForm(prev => ({ ...prev, sendAtTime: e.target.value }))}
-              />
-              <p className="text-xs text-muted-foreground mt-1">Os e-mails serão enviados neste horário todos os dias</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Data de início</label>
+                <Input
+                  type="date"
+                  value={cadenceForm.startDate}
+                  onChange={(e) => setCadenceForm(prev => ({ ...prev, startDate: e.target.value }))}
+                />
+                <p className="text-xs text-muted-foreground mt-1">Dia 1 da cadência</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Horário de disparo</label>
+                <Input
+                  type="time"
+                  value={cadenceForm.sendAtTime}
+                  onChange={(e) => setCadenceForm(prev => ({ ...prev, sendAtTime: e.target.value }))}
+                />
+                <p className="text-xs text-muted-foreground mt-1">Horário de cada envio</p>
+              </div>
             </div>
           </div>
           <DialogFooter>
