@@ -58,12 +58,15 @@ export default function EmailEnrollmentsTab() {
   const [selectedContactIds, setSelectedContactIds] = useState<string[]>([]);
   const [loadingContacts, setLoadingContacts] = useState(false);
   const [enrolling, setEnrolling] = useState(false);
+  const [creatingContact, setCreatingContact] = useState(false);
 
   // Spreadsheet tab
   const [spreadsheetContacts, setSpreadsheetContacts] = useState<SpreadsheetContact[]>([]);
   const [spreadsheetFileName, setSpreadsheetFileName] = useState<string>('');
   const [importingSpreadsheet, setImportingSpreadsheet] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
   useEffect(() => { loadData(); }, []);
 
@@ -127,6 +130,55 @@ export default function EmailEnrollmentsTab() {
     loadContacts(contactSearch);
   };
 
+  const handleCreateContactByEmail = async () => {
+    const email = contactSearch.trim().toLowerCase();
+    if (!isValidEmail(email)) {
+      toast.error('Digite um e-mail válido');
+      return;
+    }
+    setCreatingContact(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Não autenticado');
+      const { data: profile } = await supabase.from('profiles').select('account_id').eq('user_id', user.id).single();
+      if (!profile?.account_id) throw new Error('Conta não encontrada');
+
+      // Check if already exists
+      const { data: existing } = await supabase
+        .from('contacts')
+        .select('id, nome, email')
+        .eq('account_id', profile.account_id)
+        .eq('email', email)
+        .maybeSingle();
+
+      if (existing) {
+        setContacts([{ id: existing.id, nome: existing.nome, email: existing.email }]);
+        setSelectedContactIds([existing.id]);
+        toast.info('Contato já existe, selecionado automaticamente.');
+      } else {
+        const { data: newContact, error } = await supabase
+          .from('contacts')
+          .insert({
+            account_id: profile.account_id,
+            nome: email.split('@')[0],
+            email,
+          })
+          .select('id, nome, email')
+          .single();
+
+        if (error) throw error;
+        setContacts([{ id: newContact.id, nome: newContact.nome, email: newContact.email }]);
+        setSelectedContactIds([newContact.id]);
+        toast.success('Contato criado e selecionado!');
+      }
+    } catch (err: any) {
+      console.error('Erro ao criar contato:', err);
+      toast.error(err?.message || 'Erro ao criar contato');
+    } finally {
+      setCreatingContact(false);
+    }
+  };
+
   const toggleContact = (id: string) => {
     setSelectedContactIds(prev =>
       prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
@@ -151,8 +203,6 @@ export default function EmailEnrollmentsTab() {
   };
 
   // ==================== SPREADSHEET IMPORT ====================
-
-  const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -462,9 +512,22 @@ export default function EmailEnrollmentsTab() {
                       <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
                     </div>
                   ) : contacts.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-6">
-                      Nenhum contato com e-mail encontrado
-                    </p>
+                    <div className="text-center py-6 space-y-2">
+                      <p className="text-sm text-muted-foreground">
+                        Nenhum contato com e-mail encontrado
+                      </p>
+                      {contactSearch.trim() && isValidEmail(contactSearch.trim()) && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleCreateContactByEmail}
+                          disabled={creatingContact}
+                        >
+                          {creatingContact ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <UserPlus className="w-3.5 h-3.5 mr-1.5" />}
+                          Criar contato com "{contactSearch.trim()}"
+                        </Button>
+                      )}
+                    </div>
                   ) : (
                     contacts.map(contact => (
                       <label
