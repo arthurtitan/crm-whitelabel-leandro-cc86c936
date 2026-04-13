@@ -58,6 +58,7 @@ export default function EmailEnrollmentsTab() {
   const [selectedContactIds, setSelectedContactIds] = useState<string[]>([]);
   const [loadingContacts, setLoadingContacts] = useState(false);
   const [enrolling, setEnrolling] = useState(false);
+  const [creatingContact, setCreatingContact] = useState(false);
 
   // Spreadsheet tab
   const [spreadsheetContacts, setSpreadsheetContacts] = useState<SpreadsheetContact[]>([]);
