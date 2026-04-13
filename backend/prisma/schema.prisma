@@ -656,6 +656,7 @@ model EmailCadence {
   active         Boolean  @default(true)
   createdBy      String?  @map("created_by") @db.Uuid
   sendAtTime     String   @default("09:00") @map("send_at_time") @db.VarChar(5)
+  startDate      DateTime @default(now()) @map("start_date") @db.Date
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz

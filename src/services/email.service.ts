@@ -42,6 +42,7 @@ export interface EmailCadence {
   active: boolean;
   target_stage_ids?: string[];
   send_at_time?: string;
+  start_date?: string;
   created_by?: string | null;
   created_at: string;
   updated_at: string;
@@ -119,6 +120,7 @@ function mapCadence(c: any): EmailCadence {
     active: c.active,
     target_stage_ids: c.target_stage_ids ?? c.targetStageIds ?? [],
     send_at_time: c.send_at_time ?? c.sendAtTime ?? '09:00',
+    start_date: c.start_date ?? c.startDate ?? null,
     created_by: c.created_by ?? c.createdBy,
     created_at: c.created_at ?? c.createdAt,
     updated_at: c.updated_at ?? c.updatedAt,
@@ -207,12 +209,12 @@ export const emailApiService = {
     return mapCadence(unwrap(res));
   },
 
-  async createCadence(data: { name: string; description?: string; targetStageIds?: string[] }): Promise<EmailCadence> {
+  async createCadence(data: { name: string; description?: string; targetStageIds?: string[]; sendAtTime?: string; startDate?: string }): Promise<EmailCadence> {
     const res = await apiClient.post<any>(API_ENDPOINTS.EMAIL.CADENCES, data);
     return mapCadence(unwrap(res));
   },
 
-  async updateCadence(id: string, data: Partial<{ name: string; description: string; targetStageIds: string[]; active: boolean }>): Promise<EmailCadence> {
+  async updateCadence(id: string, data: Partial<{ name: string; description: string; targetStageIds: string[]; active: boolean; sendAtTime: string; startDate: string }>): Promise<EmailCadence> {
     const res = await apiClient.put<any>(API_ENDPOINTS.EMAIL.CADENCE(id), data);
     return mapCadence(unwrap(res));
   },

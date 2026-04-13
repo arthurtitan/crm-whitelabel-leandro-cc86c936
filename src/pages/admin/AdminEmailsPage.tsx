@@ -69,7 +69,7 @@ export default function AdminEmailsPage() {
   const [selectedLead, setSelectedLead] = useState<{ nome?: string; email?: string } | null>(null);
 
   // Form state
-  const [cadenceForm, setCadenceForm] = useState({ name: '', description: '', sendAtTime: '09:00' });
+  const [cadenceForm, setCadenceForm] = useState({ name: '', description: '', sendAtTime: '09:00', startDate: new Date().toISOString().split('T')[0] });
   const [stepForm, setStepForm] = useState({ dayNumber: 1, subject: '', bodyHtml: '', bodyText: '' });
 
   // ==================== CHECK CREDENTIALS ====================
@@ -123,7 +123,7 @@ export default function AdminEmailsPage() {
         toast.success('Cadência criada!');
       }
       setShowCadenceDialog(false);
-      setCadenceForm({ name: '', description: '', sendAtTime: '09:00' });
+      setCadenceForm({ name: '', description: '', sendAtTime: '09:00', startDate: new Date().toISOString().split('T')[0] });
       setEditingCadence(null);
     } catch (err: any) {
       toast.error(err?.message || 'Erro ao salvar cadência');
@@ -391,7 +391,7 @@ export default function AdminEmailsPage() {
                       )}
                       <Button size="sm" onClick={() => {
                         setEditingCadence(null);
-                        setCadenceForm({ name: '', description: '', sendAtTime: '09:00' });
+                        setCadenceForm({ name: '', description: '', sendAtTime: '09:00', startDate: new Date().toISOString().split('T')[0] });
                         setShowCadenceDialog(true);
                       }}>
                         <Plus className="w-4 h-4 mr-1" /> Nova
@@ -399,7 +399,7 @@ export default function AdminEmailsPage() {
                       {selectedCadence && (
                         <Button variant="ghost" size="sm" onClick={() => {
                           setEditingCadence(selectedCadence);
-                          setCadenceForm({ name: selectedCadence.name, description: selectedCadence.description || '', sendAtTime: selectedCadence.send_at_time || '09:00' });
+                          setCadenceForm({ name: selectedCadence.name, description: selectedCadence.description || '', sendAtTime: selectedCadence.send_at_time || '09:00', startDate: selectedCadence.start_date || new Date().toISOString().split('T')[0] });
                           setShowCadenceDialog(true);
                         }}>
                           <Edit2 className="w-4 h-4" />
@@ -409,10 +409,15 @@ export default function AdminEmailsPage() {
                   </div>
                   <p className="text-sm text-muted-foreground">
                     Sequência automática de e-mails por dias
+                    {selectedCadence?.start_date && (
+                      <span className="ml-2 inline-flex items-center gap-1">
+                        📅 Início: {new Date(selectedCadence.start_date + 'T00:00:00').toLocaleDateString('pt-BR')}
+                      </span>
+                    )}
                     {selectedCadence?.send_at_time && (
                       <span className="ml-2 inline-flex items-center gap-1">
                         <Clock className="w-3 h-3" />
-                        Disparo às {selectedCadence.send_at_time}
+                        às {selectedCadence.send_at_time}
                       </span>
                     )}
                   </p>
@@ -652,14 +657,25 @@ export default function AdminEmailsPage() {
                 rows={3}
               />
             </div>
-            <div>
-              <label className="text-sm font-medium">Horário de disparo</label>
-              <Input
-                type="time"
-                value={cadenceForm.sendAtTime}
-                onChange={(e) => setCadenceForm(prev => ({ ...prev, sendAtTime: e.target.value }))}
-              />
-              <p className="text-xs text-muted-foreground mt-1">Os e-mails serão enviados neste horário todos os dias</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Data de início</label>
+                <Input
+                  type="date"
+                  value={cadenceForm.startDate}
+                  onChange={(e) => setCadenceForm(prev => ({ ...prev, startDate: e.target.value }))}
+                />
+                <p className="text-xs text-muted-foreground mt-1">Dia 1 da cadência</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Horário de disparo</label>
+                <Input
+                  type="time"
+                  value={cadenceForm.sendAtTime}
+                  onChange={(e) => setCadenceForm(prev => ({ ...prev, sendAtTime: e.target.value }))}
+                />
+                <p className="text-xs text-muted-foreground mt-1">Horário de cada envio</p>
+              </div>
             </div>
           </div>
           <DialogFooter>

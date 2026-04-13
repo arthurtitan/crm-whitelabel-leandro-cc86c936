@@ -42,8 +42,7 @@ export const emailCloudService = {
     } as EmailCadence;
   },
 
-  async createCadence(input: { name: string; description?: string; targetStageIds?: string[] }): Promise<EmailCadence> {
-    // Get current user's account_id
+  async createCadence(input: { name: string; description?: string; targetStageIds?: string[]; sendAtTime?: string; startDate?: string }): Promise<EmailCadence> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Não autenticado');
     const { data: profile } = await supabase.from('profiles').select('account_id').eq('user_id', user.id).single();
@@ -56,6 +55,8 @@ export const emailCloudService = {
         name: input.name,
         description: input.description || null,
         target_stage_ids: input.targetStageIds || [],
+        send_at_time: input.sendAtTime || '09:00',
+        start_date: input.startDate || new Date().toISOString().split('T')[0],
         created_by: user.id,
       })
       .select('*, steps:email_cadence_steps(*), rules:email_cadence_rules(*)')
@@ -64,12 +65,14 @@ export const emailCloudService = {
     return { ...data, steps: [], rules: [] };
   },
 
-  async updateCadence(id: string, input: Partial<{ name: string; description: string; targetStageIds: string[]; active: boolean }>): Promise<EmailCadence> {
+  async updateCadence(id: string, input: Partial<{ name: string; description: string; targetStageIds: string[]; active: boolean; sendAtTime: string; startDate: string }>): Promise<EmailCadence> {
     const updateData: any = {};
     if (input.name !== undefined) updateData.name = input.name;
     if (input.description !== undefined) updateData.description = input.description;
     if (input.targetStageIds !== undefined) updateData.target_stage_ids = input.targetStageIds;
     if (input.active !== undefined) updateData.active = input.active;
+    if (input.sendAtTime !== undefined) updateData.send_at_time = input.sendAtTime;
+    if (input.startDate !== undefined) updateData.start_date = input.startDate;
 
     const { data, error } = await supabase
       .from('email_cadences')
