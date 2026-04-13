@@ -748,12 +748,23 @@ export default function AdminEmailsPage() {
                 <SelectContent>
                   <SelectItem value="opened">📬 Abrir o e-mail</SelectItem>
                   <SelectItem value="clicked">🖱️ Clicar no link</SelectItem>
-                  <SelectItem value="replied">💬 Responder</SelectItem>
-                  <SelectItem value="not_opened">🚫 Não abrir</SelectItem>
+                  <SelectItem value="not_opened">🚫 Não abrir (timeout)</SelectItem>
                   <SelectItem value="bounced">⚠️ Bounce</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+            {ruleForm.triggerEvent === 'not_opened' && (
+              <div>
+                <label className="text-sm font-medium">Tempo limite para considerar "não abriu" (horas)</label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={ruleForm.timeoutHours}
+                  onChange={(e) => setRuleForm(prev => ({ ...prev, timeoutHours: parseInt(e.target.value) || 48 }))}
+                />
+                <p className="text-xs text-muted-foreground mt-1">Ex: 48 = se não abrir em 48h após o envio, mover para outra cadência</p>
+              </div>
+            )}
             <div>
               <label className="text-sm font-medium">Mover para cadência:</label>
               <Select
@@ -776,7 +787,7 @@ export default function AdminEmailsPage() {
                 value={ruleForm.delayHours}
                 onChange={(e) => setRuleForm(prev => ({ ...prev, delayHours: parseInt(e.target.value) || 0 }))}
               />
-              <p className="text-xs text-muted-foreground mt-1">0 = mover imediatamente</p>
+              <p className="text-xs text-muted-foreground mt-1">0 = mover imediatamente após o evento</p>
             </div>
           </div>
           <DialogFooter>
