@@ -239,13 +239,17 @@ export default function AdminEmailsPage() {
 
   // ==================== PROCESS QUEUE ====================
   const handleProcessQueue = async () => {
+    if (!selectedCadence) {
+      toast.info('Selecione uma cadência antes de disparar.');
+      return;
+    }
     setProcessingQueue(true);
     try {
-      const result = await emailService.processQueue();
+      const result = await emailService.processQueue(selectedCadence.id);
       if (result.processed > 0) {
-        toast.success(`${result.processed} e-mail(s) processado(s) com sucesso!`);
+        toast.success(`${result.processed} e-mail(s) da cadência "${selectedCadence.name}" processado(s)!`);
       } else {
-        toast.info('Nenhum e-mail pendente na fila.');
+        toast.info(`Nenhum e-mail pendente na cadência "${selectedCadence.name}".`);
       }
       await loadData();
     } catch (err: any) {
@@ -285,14 +289,15 @@ export default function AdminEmailsPage() {
           variant="outline"
           size="sm"
           onClick={handleProcessQueue}
-          disabled={processingQueue}
+          disabled={processingQueue || !selectedCadence}
+          title={selectedCadence ? `Disparar e-mails da cadência "${selectedCadence.name}"` : 'Selecione uma cadência primeiro'}
         >
           {processingQueue ? (
             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
           ) : (
-            <RefreshCw className="w-4 h-4 mr-2" />
+            <Send className="w-4 h-4 mr-2" />
           )}
-          Disparar agora
+          {selectedCadence ? `Disparar "${selectedCadence.name}"` : 'Disparar agora'}
         </Button>
       </div>
 
