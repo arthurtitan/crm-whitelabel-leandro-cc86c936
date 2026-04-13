@@ -457,6 +457,7 @@ export type Database = {
           id: string
           name: string
           send_at_time: string | null
+          start_date: string | null
           target_stage_ids: string[] | null
           updated_at: string
         }
@@ -469,6 +470,7 @@ export type Database = {
           id?: string
           name: string
           send_at_time?: string | null
+          start_date?: string | null
           target_stage_ids?: string[] | null
           updated_at?: string
         }
@@ -481,6 +483,7 @@ export type Database = {
           id?: string
           name?: string
           send_at_time?: string | null
+          start_date?: string | null
           target_stage_ids?: string[] | null
           updated_at?: string
         }
