@@ -399,7 +399,7 @@ export default function AdminEmailsPage() {
                       {selectedCadence && (
                         <Button variant="ghost" size="sm" onClick={() => {
                           setEditingCadence(selectedCadence);
-                          setCadenceForm({ name: selectedCadence.name, description: selectedCadence.description || '', sendAtTime: (selectedCadence as any).send_at_time || '09:00' });
+                          setCadenceForm({ name: selectedCadence.name, description: selectedCadence.description || '', sendAtTime: selectedCadence.send_at_time || '09:00' });
                           setShowCadenceDialog(true);
                         }}>
                           <Edit2 className="w-4 h-4" />
