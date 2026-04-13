@@ -123,7 +123,7 @@ export default function AdminEmailsPage() {
         toast.success('Cadência criada!');
       }
       setShowCadenceDialog(false);
-      setCadenceForm({ name: '', description: '', sendAtTime: '09:00' });
+      setCadenceForm({ name: '', description: '', sendAtTime: '09:00', startDate: new Date().toISOString().split('T')[0] });
       setEditingCadence(null);
     } catch (err: any) {
       toast.error(err?.message || 'Erro ao salvar cadência');
@@ -391,7 +391,7 @@ export default function AdminEmailsPage() {
                       )}
                       <Button size="sm" onClick={() => {
                         setEditingCadence(null);
-                        setCadenceForm({ name: '', description: '', sendAtTime: '09:00' });
+                        setCadenceForm({ name: '', description: '', sendAtTime: '09:00', startDate: new Date().toISOString().split('T')[0] });
                         setShowCadenceDialog(true);
                       }}>
                         <Plus className="w-4 h-4 mr-1" /> Nova
@@ -399,7 +399,7 @@ export default function AdminEmailsPage() {
                       {selectedCadence && (
                         <Button variant="ghost" size="sm" onClick={() => {
                           setEditingCadence(selectedCadence);
-                          setCadenceForm({ name: selectedCadence.name, description: selectedCadence.description || '', sendAtTime: selectedCadence.send_at_time || '09:00' });
+                          setCadenceForm({ name: selectedCadence.name, description: selectedCadence.description || '', sendAtTime: selectedCadence.send_at_time || '09:00', startDate: selectedCadence.start_date || new Date().toISOString().split('T')[0] });
                           setShowCadenceDialog(true);
                         }}>
                           <Edit2 className="w-4 h-4" />
