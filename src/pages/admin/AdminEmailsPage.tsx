@@ -60,7 +60,7 @@ export default function AdminEmailsPage() {
   const [editingStep, setEditingStep] = useState<EmailCadenceStep | null>(null);
 
   // Rules
-  const [ruleForm, setRuleForm] = useState({ triggerEvent: 'opened', targetCadenceId: '', delayHours: 0 });
+  const [ruleForm, setRuleForm] = useState({ triggerEvent: 'opened', targetCadenceId: '', delayHours: 0, timeoutHours: 48 });
 
   // AI Assistant
   const [aiPrompt, setAiPrompt] = useState('');
@@ -262,8 +262,7 @@ export default function AdminEmailsPage() {
   const triggerEventLabels: Record<string, string> = {
     opened: '📬 Abriu o e-mail',
     clicked: '🖱️ Clicou no link',
-    replied: '💬 Respondeu',
-    not_opened: '🚫 Não abriu',
+    not_opened: '🚫 Não abriu (timeout)',
     bounced: '⚠️ Bounce',
   };
 
