@@ -407,7 +407,15 @@ export default function AdminEmailsPage() {
                       )}
                     </div>
                   </div>
-                  <p className="text-sm text-muted-foreground">Sequência automática de e-mails por dias</p>
+                  <p className="text-sm text-muted-foreground">
+                    Sequência automática de e-mails por dias
+                    {selectedCadence?.send_at_time && (
+                      <span className="ml-2 inline-flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        Disparo às {selectedCadence.send_at_time}
+                      </span>
+                    )}
+                  </p>
                 </CardHeader>
                 <CardContent>
                   {loading ? (
