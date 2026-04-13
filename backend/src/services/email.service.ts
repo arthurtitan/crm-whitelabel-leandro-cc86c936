@@ -171,6 +171,7 @@ export const emailService = {
     triggerEvent?: string;
     targetCadenceId?: string;
     delayHours?: number;
+    timeoutHours?: number;
     active?: boolean;
   }) {
     return prisma.emailCadenceRule.update({
