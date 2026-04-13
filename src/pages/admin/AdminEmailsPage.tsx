@@ -69,7 +69,7 @@ export default function AdminEmailsPage() {
   const [selectedLead, setSelectedLead] = useState<{ nome?: string; email?: string } | null>(null);
 
   // Form state
-  const [cadenceForm, setCadenceForm] = useState({ name: '', description: '', sendAtTime: '09:00' });
+  const [cadenceForm, setCadenceForm] = useState({ name: '', description: '', sendAtTime: '09:00', startDate: new Date().toISOString().split('T')[0] });
   const [stepForm, setStepForm] = useState({ dayNumber: 1, subject: '', bodyHtml: '', bodyText: '' });
 
   // ==================== CHECK CREDENTIALS ====================
