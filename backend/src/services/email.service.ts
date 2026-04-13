@@ -7,6 +7,68 @@ const prisma = new PrismaClient();
 // Utility: delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+/**
+ * Calculate nextSendAt based on dayNumber and cadence's sendAtTime (HH:MM).
+ * Day 1 = today (or tomorrow if time already passed), Day 2 = +1 day, etc.
+ * The send always happens at the configured hour in the account's timezone.
+ */
+function calculateNextSendAt(dayNumber: number, sendAtTime: string, timezone: string = 'America/Sao_Paulo'): Date {
+  const [hours, minutes] = (sendAtTime || '09:00').split(':').map(Number);
+  const now = new Date();
+
+  // Calculate target date: Day 1 = today, Day 2 = tomorrow, etc.
+  const daysOffset = Math.max(0, dayNumber - 1);
+  
+  // Create date in UTC but adjusted for timezone
+  // Simple approach: use Intl to get current timezone offset
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  });
+  const parts = formatter.formatToParts(now);
+  const getPart = (type: string) => parts.find(p => p.type === type)?.value || '0';
+  
+  // Build target date in the account's timezone
+  const localYear = parseInt(getPart('year'));
+  const localMonth = parseInt(getPart('month')) - 1;
+  const localDay = parseInt(getPart('day'));
+  const localHour = parseInt(getPart('hour'));
+  const localMinute = parseInt(getPart('minute'));
+  
+  // Target date
+  const targetDate = new Date(now);
+  targetDate.setDate(targetDate.getDate() + daysOffset);
+  
+  // If Day 1 and the target time already passed today, schedule for tomorrow
+  if (daysOffset === 0 && (localHour > hours || (localHour === hours && localMinute >= minutes))) {
+    targetDate.setDate(targetDate.getDate() + 1);
+  }
+  
+  // Set the time using timezone-aware calculation
+  const targetFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  });
+  const targetParts = targetFormatter.formatToParts(targetDate);
+  const getTargetPart = (type: string) => targetParts.find(p => p.type === type)?.value || '0';
+  
+  // Calculate UTC time for the target local time
+  const currentLocalHour = parseInt(getTargetPart('hour'));
+  const currentLocalMinute = parseInt(getTargetPart('minute'));
+  const hourDiff = hours - currentLocalHour;
+  const minuteDiff = minutes - currentLocalMinute;
+  
+  const result = new Date(targetDate);
+  result.setHours(result.getHours() + hourDiff);
+  result.setMinutes(result.getMinutes() + minuteDiff);
+  result.setSeconds(0);
+  result.setMilliseconds(0);
+  
+  return result;
+}
+
 // Utility: exponential backoff
 async function withBackoff<T>(
   fn: () => Promise<T>,
