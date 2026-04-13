@@ -512,9 +512,22 @@ export default function EmailEnrollmentsTab() {
                       <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
                     </div>
                   ) : contacts.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-6">
-                      Nenhum contato com e-mail encontrado
-                    </p>
+                    <div className="text-center py-6 space-y-2">
+                      <p className="text-sm text-muted-foreground">
+                        Nenhum contato com e-mail encontrado
+                      </p>
+                      {contactSearch.trim() && isValidEmail(contactSearch.trim()) && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleCreateContactByEmail}
+                          disabled={creatingContact}
+                        >
+                          {creatingContact ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <UserPlus className="w-3.5 h-3.5 mr-1.5" />}
+                          Criar contato com "{contactSearch.trim()}"
+                        </Button>
+                      )}
+                    </div>
                   ) : (
                     contacts.map(contact => (
                       <label
