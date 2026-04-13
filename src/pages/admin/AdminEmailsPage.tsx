@@ -49,6 +49,7 @@ export default function AdminEmailsPage() {
   const [stats, setStats] = useState<SendStats>({ total: 0, sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, failed: 0 });
   const [loading, setLoading] = useState(true);
   const [credentialsConfigured, setCredentialsConfigured] = useState<boolean | null>(null);
+  const [processingQueue, setProcessingQueue] = useState(false);
 
   // Dialogs
   const [showCadenceDialog, setShowCadenceDialog] = useState(false);
@@ -236,6 +237,24 @@ export default function AdminEmailsPage() {
     }
   };
 
+  // ==================== PROCESS QUEUE ====================
+  const handleProcessQueue = async () => {
+    setProcessingQueue(true);
+    try {
+      const result = await emailService.processQueue();
+      if (result.processed > 0) {
+        toast.success(`${result.processed} e-mail(s) processado(s) com sucesso!`);
+      } else {
+        toast.info('Nenhum e-mail pendente na fila.');
+      }
+      await loadData();
+    } catch (err: any) {
+      toast.error(err?.message || 'Erro ao processar fila de e-mails');
+    } finally {
+      setProcessingQueue(false);
+    }
+  };
+
   const triggerEventLabels: Record<string, string> = {
     opened: '📬 Abriu o e-mail',
     clicked: '🖱️ Clicou no link',
@@ -262,6 +281,19 @@ export default function AdminEmailsPage() {
           <h1 className="text-2xl font-bold text-foreground">E-mails</h1>
           <p className="text-muted-foreground">Automação de e-mails com cadências inteligentes</p>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleProcessQueue}
+          disabled={processingQueue}
+        >
+          {processingQueue ? (
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          ) : (
+            <RefreshCw className="w-4 h-4 mr-2" />
+          )}
+          Disparar agora
+        </Button>
       </div>
 
       {/* Credentials Warning (white-label) */}
