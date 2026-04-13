@@ -1,13 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Users, Loader2, UserMinus, UserPlus, Search } from 'lucide-react';
+import { Users, Loader2, UserMinus, UserPlus, Search, Upload, FileSpreadsheet, X } from 'lucide-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -17,6 +18,7 @@ import { useBackend } from '@/config/backend.config';
 import { apiClient } from '@/api/client';
 import { API_ENDPOINTS } from '@/api/endpoints';
 import { supabase } from '@/integrations/supabase/client';
+import * as XLSX from 'xlsx';
 
 const statusLabels: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   active: { label: 'Ativo', variant: 'default' },
@@ -32,6 +34,12 @@ interface ContactOption {
   email: string | null;
 }
 
+interface SpreadsheetContact {
+  nome: string;
+  email: string;
+  valid: boolean;
+}
+
 export default function EmailEnrollmentsTab() {
   const [enrollments, setEnrollments] = useState<EmailEnrollment[]>([]);
   const [cadences, setCadences] = useState<EmailCadence[]>([]);
@@ -42,11 +50,20 @@ export default function EmailEnrollmentsTab() {
   // Enroll dialog
   const [showEnrollDialog, setShowEnrollDialog] = useState(false);
   const [enrollCadenceId, setEnrollCadenceId] = useState<string>('');
+  const [enrollTab, setEnrollTab] = useState<string>('manual');
+
+  // Manual tab
   const [contacts, setContacts] = useState<ContactOption[]>([]);
   const [contactSearch, setContactSearch] = useState('');
   const [selectedContactIds, setSelectedContactIds] = useState<string[]>([]);
   const [loadingContacts, setLoadingContacts] = useState(false);
   const [enrolling, setEnrolling] = useState(false);
+
+  // Spreadsheet tab
+  const [spreadsheetContacts, setSpreadsheetContacts] = useState<SpreadsheetContact[]>([]);
+  const [spreadsheetFileName, setSpreadsheetFileName] = useState<string>('');
+  const [importingSpreadsheet, setImportingSpreadsheet] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { loadData(); }, []);
 
@@ -100,6 +117,9 @@ export default function EmailEnrollmentsTab() {
     setEnrollCadenceId(cadences.length > 0 ? cadences[0].id : '');
     setSelectedContactIds([]);
     setContactSearch('');
+    setEnrollTab('manual');
+    setSpreadsheetContacts([]);
+    setSpreadsheetFileName('');
     loadContacts();
   };
 
@@ -113,6 +133,8 @@ export default function EmailEnrollmentsTab() {
     );
   };
 
+  // ==================== MANUAL ENROLL ====================
+
   const handleEnroll = async () => {
     if (!enrollCadenceId || selectedContactIds.length === 0) return;
     setEnrolling(true);
@@ -125,6 +147,137 @@ export default function EmailEnrollmentsTab() {
       toast.error(err?.message || 'Erro ao inscrever contatos');
     } finally {
       setEnrolling(false);
+    }
+  };
+
+  // ==================== SPREADSHEET IMPORT ====================
+
+  const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+      'text/csv',
+    ];
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (!validTypes.includes(file.type) && !['xlsx', 'xls', 'csv'].includes(ext || '')) {
+      toast.error('Formato inválido. Use .xlsx, .xls ou .csv');
+      return;
+    }
+
+    setSpreadsheetFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const data = new Uint8Array(evt.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+        if (rows.length === 0) {
+          toast.error('Planilha vazia');
+          return;
+        }
+
+        // Auto-detect column names
+        const keys = Object.keys(rows[0]);
+        const emailCol = keys.find(k => /email|e-mail|e_mail/i.test(k)) || keys.find(k => {
+          const sample = String(rows[0][k]);
+          return isValidEmail(sample);
+        });
+        const nameCol = keys.find(k => /nome|name|contato|contact/i.test(k));
+
+        if (!emailCol) {
+          toast.error('Coluna de e-mail não encontrada. Certifique-se que há uma coluna chamada "email".');
+          return;
+        }
+
+        const parsed: SpreadsheetContact[] = rows.map(row => {
+          const email = String(row[emailCol] || '').trim().toLowerCase();
+          const nome = nameCol ? String(row[nameCol] || '').trim() : '';
+          return { nome, email, valid: isValidEmail(email) };
+        }).filter(c => c.email.length > 0);
+
+        setSpreadsheetContacts(parsed);
+        toast.success(`${parsed.length} contato(s) encontrado(s) na planilha`);
+      } catch (err) {
+        console.error('Erro ao ler planilha:', err);
+        toast.error('Erro ao ler a planilha');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    // Reset input
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleSpreadsheetEnroll = async () => {
+    if (!enrollCadenceId) return;
+    const validContacts = spreadsheetContacts.filter(c => c.valid);
+    if (validContacts.length === 0) {
+      toast.error('Nenhum contato com e-mail válido');
+      return;
+    }
+
+    setImportingSpreadsheet(true);
+    try {
+      // Get user's account_id
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Não autenticado');
+      const { data: profile } = await supabase.from('profiles').select('account_id').eq('user_id', user.id).single();
+      if (!profile?.account_id) throw new Error('Conta não encontrada');
+
+      // Create or find contacts, then enroll
+      const contactIds: string[] = [];
+
+      for (const sc of validContacts) {
+        // Check if contact exists by email
+        const { data: existing } = await supabase
+          .from('contacts')
+          .select('id')
+          .eq('account_id', profile.account_id)
+          .eq('email', sc.email)
+          .limit(1)
+          .maybeSingle();
+
+        if (existing) {
+          contactIds.push(existing.id);
+        } else {
+          // Create new contact
+          const { data: newContact, error } = await supabase
+            .from('contacts')
+            .insert({
+              account_id: profile.account_id,
+              nome: sc.nome || sc.email.split('@')[0],
+              email: sc.email,
+            })
+            .select('id')
+            .single();
+
+          if (error) {
+            console.error(`Erro ao criar contato ${sc.email}:`, error.message);
+            continue;
+          }
+          if (newContact) contactIds.push(newContact.id);
+        }
+      }
+
+      if (contactIds.length === 0) {
+        toast.error('Nenhum contato pôde ser criado/encontrado');
+        return;
+      }
+
+      await emailService.enroll(enrollCadenceId, contactIds);
+      toast.success(`${contactIds.length} contato(s) inscrito(s) via planilha!`);
+      setShowEnrollDialog(false);
+      await loadData();
+    } catch (err: any) {
+      toast.error(err?.message || 'Erro ao importar planilha');
+    } finally {
+      setImportingSpreadsheet(false);
     }
   };
 
@@ -147,6 +300,8 @@ export default function EmailEnrollmentsTab() {
     : enrollments.filter(e => e.cadence_id === filterCadence);
 
   const cadenceMap = new Map(cadences.map(c => [c.id, c.name]));
+  const validSpreadsheetCount = spreadsheetContacts.filter(c => c.valid).length;
+  const invalidSpreadsheetCount = spreadsheetContacts.filter(c => !c.valid).length;
 
   if (loading) {
     return (
@@ -190,7 +345,6 @@ export default function EmailEnrollmentsTab() {
         </Card>
       ) : (
         <div className="space-y-2">
-          {/* Header */}
           <div className="grid grid-cols-12 gap-2 px-3 py-2 text-xs font-medium text-muted-foreground uppercase">
             <div className="col-span-3">Contato</div>
             <div className="col-span-3">Cadência</div>
@@ -252,10 +406,12 @@ export default function EmailEnrollmentsTab() {
 
       {/* Enroll Dialog */}
       <Dialog open={showEnrollDialog} onOpenChange={setShowEnrollDialog}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Inscrever Contatos em Cadência</DialogTitle>
+            <DialogDescription>Selecione contatos manualmente ou importe via planilha.</DialogDescription>
           </DialogHeader>
+
           <div className="space-y-4">
             <div>
               <label className="text-sm font-medium">Cadência</label>
@@ -271,65 +427,173 @@ export default function EmailEnrollmentsTab() {
               </Select>
             </div>
 
-            <div>
-              <label className="text-sm font-medium">Buscar contatos (com e-mail)</label>
-              <div className="flex gap-2 mt-1">
-                <Input
-                  placeholder="Nome ou e-mail..."
-                  value={contactSearch}
-                  onChange={(e) => setContactSearch(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSearchContacts()}
-                />
-                <Button variant="outline" size="sm" onClick={handleSearchContacts}>
-                  <Search className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
+            <Tabs value={enrollTab} onValueChange={setEnrollTab}>
+              <TabsList className="w-full">
+                <TabsTrigger value="manual" className="flex-1">
+                  <UserPlus className="w-3.5 h-3.5 mr-1.5" />
+                  Manual
+                </TabsTrigger>
+                <TabsTrigger value="spreadsheet" className="flex-1">
+                  <FileSpreadsheet className="w-3.5 h-3.5 mr-1.5" />
+                  Planilha
+                </TabsTrigger>
+              </TabsList>
 
-            <div className="border rounded-lg max-h-[250px] overflow-y-auto">
-              {loadingContacts ? (
-                <div className="flex justify-center py-6">
-                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-                </div>
-              ) : contacts.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-6">
-                  Nenhum contato com e-mail encontrado
-                </p>
-              ) : (
-                contacts.map(contact => (
-                  <label
-                    key={contact.id}
-                    className="flex items-center gap-3 px-3 py-2 hover:bg-muted/50 cursor-pointer border-b last:border-b-0"
-                  >
-                    <Checkbox
-                      checked={selectedContactIds.includes(contact.id)}
-                      onCheckedChange={() => toggleContact(contact.id)}
+              {/* MANUAL TAB */}
+              <TabsContent value="manual" className="space-y-3 mt-3">
+                <div>
+                  <label className="text-sm font-medium">Buscar contatos (com e-mail)</label>
+                  <div className="flex gap-2 mt-1">
+                    <Input
+                      placeholder="Nome ou e-mail..."
+                      value={contactSearch}
+                      onChange={(e) => setContactSearch(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSearchContacts()}
                     />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">{contact.nome || 'Sem nome'}</p>
-                      <p className="text-xs text-muted-foreground truncate">{contact.email}</p>
-                    </div>
-                  </label>
-                ))
-              )}
-            </div>
+                    <Button variant="outline" size="sm" onClick={handleSearchContacts}>
+                      <Search className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
 
-            {selectedContactIds.length > 0 && (
-              <p className="text-sm text-muted-foreground">
-                {selectedContactIds.length} contato(s) selecionado(s)
-              </p>
-            )}
+                <div className="border rounded-lg max-h-[200px] overflow-y-auto">
+                  {loadingContacts ? (
+                    <div className="flex justify-center py-6">
+                      <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : contacts.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-6">
+                      Nenhum contato com e-mail encontrado
+                    </p>
+                  ) : (
+                    contacts.map(contact => (
+                      <label
+                        key={contact.id}
+                        className="flex items-center gap-3 px-3 py-2 hover:bg-muted/50 cursor-pointer border-b last:border-b-0"
+                      >
+                        <Checkbox
+                          checked={selectedContactIds.includes(contact.id)}
+                          onCheckedChange={() => toggleContact(contact.id)}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">{contact.nome || 'Sem nome'}</p>
+                          <p className="text-xs text-muted-foreground truncate">{contact.email}</p>
+                        </div>
+                      </label>
+                    ))
+                  )}
+                </div>
+
+                {selectedContactIds.length > 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    {selectedContactIds.length} contato(s) selecionado(s)
+                  </p>
+                )}
+
+                <Button
+                  className="w-full"
+                  onClick={handleEnroll}
+                  disabled={enrolling || !enrollCadenceId || selectedContactIds.length === 0}
+                >
+                  {enrolling ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <UserPlus className="w-4 h-4 mr-2" />}
+                  Inscrever {selectedContactIds.length > 0 ? `(${selectedContactIds.length})` : ''}
+                </Button>
+              </TabsContent>
+
+              {/* SPREADSHEET TAB */}
+              <TabsContent value="spreadsheet" className="space-y-3 mt-3">
+                <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    className="hidden"
+                    onChange={handleFileUpload}
+                  />
+                  {spreadsheetFileName ? (
+                    <div className="space-y-2">
+                      <FileSpreadsheet className="w-8 h-8 mx-auto text-primary" />
+                      <div className="flex items-center justify-center gap-2">
+                        <p className="text-sm font-medium">{spreadsheetFileName}</p>
+                        <Button
+                          variant="ghost" size="sm" className="h-6 w-6 p-0"
+                          onClick={() => {
+                            setSpreadsheetContacts([]);
+                            setSpreadsheetFileName('');
+                          }}
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </div>
+                      <div className="flex justify-center gap-3 text-xs">
+                        <span className="text-green-500">{validSpreadsheetCount} válido(s)</span>
+                        {invalidSpreadsheetCount > 0 && (
+                          <span className="text-destructive">{invalidSpreadsheetCount} inválido(s)</span>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Upload className="w-8 h-8 mx-auto text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">
+                        Arraste ou clique para enviar
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Formatos: .xlsx, .xls, .csv — com coluna "email" (e opcionalmente "nome")
+                      </p>
+                      <Button
+                        variant="outline" size="sm"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        Selecionar arquivo
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {spreadsheetContacts.length > 0 && (
+                  <div className="border rounded-lg max-h-[150px] overflow-y-auto">
+                    <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase border-b bg-muted/30 grid grid-cols-12">
+                      <div className="col-span-5">Nome</div>
+                      <div className="col-span-5">E-mail</div>
+                      <div className="col-span-2 text-center">Status</div>
+                    </div>
+                    {spreadsheetContacts.slice(0, 50).map((sc, idx) => (
+                      <div key={idx} className="px-3 py-1.5 text-sm border-b last:border-b-0 grid grid-cols-12 items-center">
+                        <div className="col-span-5 truncate">{sc.nome || '—'}</div>
+                        <div className="col-span-5 truncate text-muted-foreground">{sc.email}</div>
+                        <div className="col-span-2 text-center">
+                          {sc.valid ? (
+                            <Badge variant="outline" className="text-[10px] text-green-500 border-green-500/30">OK</Badge>
+                          ) : (
+                            <Badge variant="destructive" className="text-[10px]">Inválido</Badge>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    {spreadsheetContacts.length > 50 && (
+                      <p className="text-xs text-muted-foreground text-center py-2">
+                        ... e mais {spreadsheetContacts.length - 50} contato(s)
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <Button
+                  className="w-full"
+                  onClick={handleSpreadsheetEnroll}
+                  disabled={importingSpreadsheet || !enrollCadenceId || validSpreadsheetCount === 0}
+                >
+                  {importingSpreadsheet ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Upload className="w-4 h-4 mr-2" />
+                  )}
+                  Importar e Inscrever ({validSpreadsheetCount})
+                </Button>
+              </TabsContent>
+            </Tabs>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEnrollDialog(false)}>Cancelar</Button>
-            <Button
-              onClick={handleEnroll}
-              disabled={enrolling || !enrollCadenceId || selectedContactIds.length === 0}
-            >
-              {enrolling ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <UserPlus className="w-4 h-4 mr-2" />}
-              Inscrever {selectedContactIds.length > 0 ? `(${selectedContactIds.length})` : ''}
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 
