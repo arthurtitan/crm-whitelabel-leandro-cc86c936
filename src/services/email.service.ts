@@ -25,9 +25,10 @@ export interface EmailCadenceStep {
 export interface EmailCadenceRule {
   id: string;
   cadence_id: string;
-  trigger_event: 'opened' | 'clicked' | 'replied' | 'not_opened' | 'bounced';
+  trigger_event: 'opened' | 'clicked' | 'not_opened' | 'bounced';
   target_cadence_id: string;
   delay_hours: number;
+  timeout_hours?: number;
   active: boolean;
   created_at: string;
   updated_at: string;
