@@ -138,38 +138,58 @@ export default function EmailEnrollmentsTab() {
     }
     setCreatingContact(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Não autenticado');
-      const { data: profile } = await supabase.from('profiles').select('account_id').eq('user_id', user.id).single();
-      if (!profile?.account_id) throw new Error('Conta não encontrada');
+      if (useBackend) {
+        // Search for existing contact by email via backend
+        const searchRes = await apiClient.get<any>(API_ENDPOINTS.CONTACTS.LIST, {
+          params: { search: email, limit: 5 },
+        });
+        const searchData = searchRes?.data ?? searchRes;
+        const list = Array.isArray(searchData) ? searchData : (searchData?.contacts || searchData?.data || []);
+        const existing = list.find((c: any) => c.email?.toLowerCase() === email);
 
-      // Check if already exists
-      const { data: existing } = await supabase
-        .from('contacts')
-        .select('id, nome, email')
-        .eq('account_id', profile.account_id)
-        .eq('email', email)
-        .maybeSingle();
-
-      if (existing) {
-        setContacts([{ id: existing.id, nome: existing.nome, email: existing.email }]);
-        setSelectedContactIds([existing.id]);
-        toast.info('Contato já existe, selecionado automaticamente.');
-      } else {
-        const { data: newContact, error } = await supabase
-          .from('contacts')
-          .insert({
-            account_id: profile.account_id,
+        if (existing) {
+          setContacts([{ id: existing.id, nome: existing.nome || existing.name || null, email: existing.email }]);
+          setSelectedContactIds([existing.id]);
+          toast.info('Contato já existe, selecionado automaticamente.');
+        } else {
+          const createRes = await apiClient.post<any>(API_ENDPOINTS.CONTACTS.CREATE, {
             nome: email.split('@')[0],
             email,
-          })
-          .select('id, nome, email')
-          .single();
+            origem: 'outro',
+          });
+          const newContact = createRes?.data ?? createRes;
+          setContacts([{ id: newContact.id, nome: newContact.nome || newContact.name || null, email: newContact.email }]);
+          setSelectedContactIds([newContact.id]);
+          toast.success('Contato criado e selecionado!');
+        }
+      } else {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('Não autenticado');
+        const { data: profile } = await supabase.from('profiles').select('account_id').eq('user_id', user.id).single();
+        if (!profile?.account_id) throw new Error('Conta não encontrada');
 
-        if (error) throw error;
-        setContacts([{ id: newContact.id, nome: newContact.nome, email: newContact.email }]);
-        setSelectedContactIds([newContact.id]);
-        toast.success('Contato criado e selecionado!');
+        const { data: existing } = await supabase
+          .from('contacts')
+          .select('id, nome, email')
+          .eq('account_id', profile.account_id)
+          .eq('email', email)
+          .maybeSingle();
+
+        if (existing) {
+          setContacts([{ id: existing.id, nome: existing.nome, email: existing.email }]);
+          setSelectedContactIds([existing.id]);
+          toast.info('Contato já existe, selecionado automaticamente.');
+        } else {
+          const { data: newContact, error } = await supabase
+            .from('contacts')
+            .insert({ account_id: profile.account_id, nome: email.split('@')[0], email })
+            .select('id, nome, email')
+            .single();
+          if (error) throw error;
+          setContacts([{ id: newContact.id, nome: newContact.nome, email: newContact.email }]);
+          setSelectedContactIds([newContact.id]);
+          toast.success('Contato criado e selecionado!');
+        }
       }
     } catch (err: any) {
       console.error('Erro ao criar contato:', err);
