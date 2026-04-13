@@ -219,8 +219,9 @@ export const emailService = {
 
     const firstStep = cadence.steps[0];
     const now = new Date();
+    // Day 1 = send immediately; Day 2 = 24h from now; Day N = (N-1)*24h
     const nextSendAt = firstStep
-      ? new Date(now.getTime() + firstStep.dayNumber * 24 * 60 * 60 * 1000)
+      ? new Date(now.getTime() + Math.max(0, firstStep.dayNumber - 1) * 24 * 60 * 60 * 1000)
       : null;
 
     const enrollments = await Promise.all(
@@ -439,7 +440,8 @@ export const emailService = {
             const nextStep = steps[nextStepIndex];
 
             if (nextStep) {
-              const nextSendAt = new Date(now.getTime() + nextStep.dayNumber * 24 * 60 * 60 * 1000);
+              const daysDiff = Math.max(0, nextStep.dayNumber - currentStep.dayNumber);
+              const nextSendAt = new Date(now.getTime() + daysDiff * 24 * 60 * 60 * 1000);
               await prisma.emailEnrollment.update({
                 where: { id: enrollment.id },
                 data: { currentStep: nextStepIndex, nextSendAt },
