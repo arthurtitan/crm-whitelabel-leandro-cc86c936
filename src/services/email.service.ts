@@ -331,7 +331,7 @@ export const emailApiService = {
     return (unwrap<any[]>(res) || []).map(mapRule);
   },
 
-  async createRule(cadenceId: string, data: { triggerEvent: string; targetCadenceId: string; delayHours?: number }): Promise<EmailCadenceRule> {
+  async createRule(cadenceId: string, data: { triggerEvent: string; targetCadenceId: string; delayHours?: number; timeoutHours?: number }): Promise<EmailCadenceRule> {
     const res = await apiClient.post<any>(API_ENDPOINTS.EMAIL.CADENCE_RULES(cadenceId), data);
     return mapRule(unwrap(res));
   },

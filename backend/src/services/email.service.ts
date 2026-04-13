@@ -153,6 +153,7 @@ export const emailService = {
     triggerEvent: string;
     targetCadenceId: string;
     delayHours?: number;
+    timeoutHours?: number;
   }) {
     return prisma.emailCadenceRule.create({
       data: {
@@ -160,6 +161,7 @@ export const emailService = {
         triggerEvent: data.triggerEvent,
         targetCadenceId: data.targetCadenceId,
         delayHours: data.delayHours || 0,
+        timeoutHours: data.timeoutHours || 48,
       },
       include: { targetCadence: { select: { id: true, name: true } } },
     });
