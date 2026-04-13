@@ -239,13 +239,17 @@ export default function AdminEmailsPage() {
 
   // ==================== PROCESS QUEUE ====================
   const handleProcessQueue = async () => {
+    if (!selectedCadence) {
+      toast.info('Selecione uma cadência antes de disparar.');
+      return;
+    }
     setProcessingQueue(true);
     try {
-      const result = await emailService.processQueue();
+      const result = await emailService.processQueue(selectedCadence.id);
       if (result.processed > 0) {
-        toast.success(`${result.processed} e-mail(s) processado(s) com sucesso!`);
+        toast.success(`${result.processed} e-mail(s) da cadência "${selectedCadence.name}" processado(s)!`);
       } else {
-        toast.info('Nenhum e-mail pendente na fila.');
+        toast.info(`Nenhum e-mail pendente na cadência "${selectedCadence.name}".`);
       }
       await loadData();
     } catch (err: any) {

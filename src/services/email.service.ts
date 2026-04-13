@@ -299,8 +299,8 @@ export const emailApiService = {
   },
 
   // Process queue
-  async processQueue(): Promise<{ success: boolean; processed: number }> {
-    const res = await apiClient.post<any>(API_ENDPOINTS.EMAIL.PROCESS_QUEUE, {});
+  async processQueue(cadenceId?: string): Promise<{ success: boolean; processed: number }> {
+    const res = await apiClient.post<any>(API_ENDPOINTS.EMAIL.PROCESS_QUEUE, { cadenceId });
     return unwrap(res);
   },
 
