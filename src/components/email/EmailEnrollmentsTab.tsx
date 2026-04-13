@@ -294,44 +294,69 @@ export default function EmailEnrollmentsTab() {
 
     setImportingSpreadsheet(true);
     try {
-      // Get user's account_id
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Não autenticado');
-      const { data: profile } = await supabase.from('profiles').select('account_id').eq('user_id', user.id).single();
-      if (!profile?.account_id) throw new Error('Conta não encontrada');
-
-      // Create or find contacts, then enroll
       const contactIds: string[] = [];
 
-      for (const sc of validContacts) {
-        // Check if contact exists by email
-        const { data: existing } = await supabase
-          .from('contacts')
-          .select('id')
-          .eq('account_id', profile.account_id)
-          .eq('email', sc.email)
-          .limit(1)
-          .maybeSingle();
+      if (useBackend) {
+        // Backend mode: use API calls
+        for (const sc of validContacts) {
+          try {
+            const searchRes = await apiClient.get<any>(API_ENDPOINTS.CONTACTS.LIST, {
+              params: { search: sc.email, limit: 5 },
+            });
+            const searchData = searchRes?.data ?? searchRes;
+            const list = Array.isArray(searchData) ? searchData : (searchData?.contacts || searchData?.data || []);
+            const existing = list.find((c: any) => c.email?.toLowerCase() === sc.email);
 
-        if (existing) {
-          contactIds.push(existing.id);
-        } else {
-          // Create new contact
-          const { data: newContact, error } = await supabase
-            .from('contacts')
-            .insert({
-              account_id: profile.account_id,
-              nome: sc.nome || sc.email.split('@')[0],
-              email: sc.email,
-            })
-            .select('id')
-            .single();
-
-          if (error) {
-            console.error(`Erro ao criar contato ${sc.email}:`, error.message);
-            continue;
+            if (existing) {
+              contactIds.push(existing.id);
+            } else {
+              const createRes = await apiClient.post<any>(API_ENDPOINTS.CONTACTS.CREATE, {
+                nome: sc.nome || sc.email.split('@')[0],
+                email: sc.email,
+                origem: 'outro',
+              });
+              const newContact = createRes?.data ?? createRes;
+              if (newContact?.id) contactIds.push(newContact.id);
+            }
+          } catch (err) {
+            console.error(`Erro ao criar contato ${sc.email}:`, err);
           }
-          if (newContact) contactIds.push(newContact.id);
+        }
+      } else {
+        // Cloud mode: use Supabase directly
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('Não autenticado');
+        const { data: profile } = await supabase.from('profiles').select('account_id').eq('user_id', user.id).single();
+        if (!profile?.account_id) throw new Error('Conta não encontrada');
+
+        for (const sc of validContacts) {
+          const { data: existing } = await supabase
+            .from('contacts')
+            .select('id')
+            .eq('account_id', profile.account_id)
+            .eq('email', sc.email)
+            .limit(1)
+            .maybeSingle();
+
+          if (existing) {
+            contactIds.push(existing.id);
+          } else {
+            const { data: newContact, error } = await supabase
+              .from('contacts')
+              .insert({
+                account_id: profile.account_id,
+                nome: sc.nome || sc.email.split('@')[0],
+                email: sc.email,
+              })
+              .select('id')
+              .single();
+
+            if (error) {
+              console.error(`Erro ao criar contato ${sc.email}:`, error.message);
+              continue;
+            }
+            if (newContact) contactIds.push(newContact.id);
+          }
         }
       }
 
