@@ -409,10 +409,15 @@ export default function AdminEmailsPage() {
                   </div>
                   <p className="text-sm text-muted-foreground">
                     Sequência automática de e-mails por dias
+                    {selectedCadence?.start_date && (
+                      <span className="ml-2 inline-flex items-center gap-1">
+                        📅 Início: {new Date(selectedCadence.start_date + 'T00:00:00').toLocaleDateString('pt-BR')}
+                      </span>
+                    )}
                     {selectedCadence?.send_at_time && (
                       <span className="ml-2 inline-flex items-center gap-1">
                         <Clock className="w-3 h-3" />
-                        Disparo às {selectedCadence.send_at_time}
+                        às {selectedCadence.send_at_time}
                       </span>
                     )}
                   </p>
