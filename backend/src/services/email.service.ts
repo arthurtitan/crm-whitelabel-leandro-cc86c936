@@ -219,8 +219,9 @@ export const emailService = {
 
     const firstStep = cadence.steps[0];
     const now = new Date();
+    // Day 1 = send immediately; Day 2 = 24h from now; Day N = (N-1)*24h
     const nextSendAt = firstStep
-      ? new Date(now.getTime() + firstStep.dayNumber * 24 * 60 * 60 * 1000)
+      ? new Date(now.getTime() + Math.max(0, firstStep.dayNumber - 1) * 24 * 60 * 60 * 1000)
       : null;
 
     const enrollments = await Promise.all(
