@@ -274,16 +274,15 @@ export const emailService = {
   }) {
     const cadence = await prisma.emailCadence.findUnique({
       where: { id: data.cadenceId },
-      include: { steps: { orderBy: { ordem: 'asc' }, take: 1 } },
+      include: { steps: { orderBy: { ordem: 'asc' }, take: 1 }, account: { select: { timezone: true } } },
     });
 
     if (!cadence) throw new Error('Cadência não encontrada');
 
     const firstStep = cadence.steps[0];
-    const now = new Date();
-    // Day 1 = send immediately; Day 2 = 24h from now; Day N = (N-1)*24h
+    const timezone = cadence.account?.timezone || 'America/Sao_Paulo';
     const nextSendAt = firstStep
-      ? new Date(now.getTime() + Math.max(0, firstStep.dayNumber - 1) * 24 * 60 * 60 * 1000)
+      ? calculateNextSendAt(firstStep.dayNumber, cadence.sendAtTime, timezone)
       : null;
 
     const enrollments = await Promise.all(
@@ -501,9 +500,8 @@ export const emailService = {
             const nextStepIndex = enrollment.currentStep + 1;
             const nextStep = steps[nextStepIndex];
 
-            if (nextStep) {
-              const daysDiff = Math.max(0, nextStep.dayNumber - currentStep.dayNumber);
-              const nextSendAt = new Date(now.getTime() + daysDiff * 24 * 60 * 60 * 1000);
+              const timezone = (await prisma.account.findUnique({ where: { id: enrollment.accountId }, select: { timezone: true } }))?.timezone || 'America/Sao_Paulo';
+              const nextSendAt = calculateNextSendAt(nextStep.dayNumber, enrollment.cadence.sendAtTime, timezone);
               await prisma.emailEnrollment.update({
                 where: { id: enrollment.id },
                 data: { currentStep: nextStepIndex, nextSendAt },
