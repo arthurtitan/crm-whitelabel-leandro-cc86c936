@@ -66,6 +66,8 @@ export default function EmailEnrollmentsTab() {
   const [importingSpreadsheet, setImportingSpreadsheet] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
   useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
