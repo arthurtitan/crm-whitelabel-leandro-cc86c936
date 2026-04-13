@@ -41,6 +41,7 @@ export interface EmailCadence {
   description?: string | null;
   active: boolean;
   target_stage_ids?: string[];
+  send_at_time?: string;
   created_by?: string | null;
   created_at: string;
   updated_at: string;
@@ -117,6 +118,7 @@ function mapCadence(c: any): EmailCadence {
     description: c.description,
     active: c.active,
     target_stage_ids: c.target_stage_ids ?? c.targetStageIds ?? [],
+    send_at_time: c.send_at_time ?? c.sendAtTime ?? '09:00',
     created_by: c.created_by ?? c.createdBy,
     created_at: c.created_at ?? c.createdAt,
     updated_at: c.updated_at ?? c.updatedAt,

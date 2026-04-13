@@ -69,7 +69,7 @@ export default function AdminEmailsPage() {
   const [selectedLead, setSelectedLead] = useState<{ nome?: string; email?: string } | null>(null);
 
   // Form state
-  const [cadenceForm, setCadenceForm] = useState({ name: '', description: '' });
+  const [cadenceForm, setCadenceForm] = useState({ name: '', description: '', sendAtTime: '09:00' });
   const [stepForm, setStepForm] = useState({ dayNumber: 1, subject: '', bodyHtml: '', bodyText: '' });
 
   // ==================== CHECK CREDENTIALS ====================
@@ -123,7 +123,7 @@ export default function AdminEmailsPage() {
         toast.success('Cadência criada!');
       }
       setShowCadenceDialog(false);
-      setCadenceForm({ name: '', description: '' });
+      setCadenceForm({ name: '', description: '', sendAtTime: '09:00' });
       setEditingCadence(null);
     } catch (err: any) {
       toast.error(err?.message || 'Erro ao salvar cadência');
@@ -391,7 +391,7 @@ export default function AdminEmailsPage() {
                       )}
                       <Button size="sm" onClick={() => {
                         setEditingCadence(null);
-                        setCadenceForm({ name: '', description: '' });
+                        setCadenceForm({ name: '', description: '', sendAtTime: '09:00' });
                         setShowCadenceDialog(true);
                       }}>
                         <Plus className="w-4 h-4 mr-1" /> Nova
@@ -399,7 +399,7 @@ export default function AdminEmailsPage() {
                       {selectedCadence && (
                         <Button variant="ghost" size="sm" onClick={() => {
                           setEditingCadence(selectedCadence);
-                          setCadenceForm({ name: selectedCadence.name, description: selectedCadence.description || '' });
+                          setCadenceForm({ name: selectedCadence.name, description: selectedCadence.description || '', sendAtTime: selectedCadence.send_at_time || '09:00' });
                           setShowCadenceDialog(true);
                         }}>
                           <Edit2 className="w-4 h-4" />
@@ -407,7 +407,15 @@ export default function AdminEmailsPage() {
                       )}
                     </div>
                   </div>
-                  <p className="text-sm text-muted-foreground">Sequência automática de e-mails por dias</p>
+                  <p className="text-sm text-muted-foreground">
+                    Sequência automática de e-mails por dias
+                    {selectedCadence?.send_at_time && (
+                      <span className="ml-2 inline-flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        Disparo às {selectedCadence.send_at_time}
+                      </span>
+                    )}
+                  </p>
                 </CardHeader>
                 <CardContent>
                   {loading ? (
@@ -643,6 +651,15 @@ export default function AdminEmailsPage() {
                 placeholder="Descrição da cadência..."
                 rows={3}
               />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Horário de disparo</label>
+              <Input
+                type="time"
+                value={cadenceForm.sendAtTime}
+                onChange={(e) => setCadenceForm(prev => ({ ...prev, sendAtTime: e.target.value }))}
+              />
+              <p className="text-xs text-muted-foreground mt-1">Os e-mails serão enviados neste horário todos os dias</p>
             </div>
           </div>
           <DialogFooter>

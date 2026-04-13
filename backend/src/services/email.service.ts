@@ -7,6 +7,68 @@ const prisma = new PrismaClient();
 // Utility: delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+/**
+ * Calculate nextSendAt based on dayNumber and cadence's sendAtTime (HH:MM).
+ * Day 1 = today (or tomorrow if time already passed), Day 2 = +1 day, etc.
+ * The send always happens at the configured hour in the account's timezone.
+ */
+function calculateNextSendAt(dayNumber: number, sendAtTime: string, timezone: string = 'America/Sao_Paulo'): Date {
+  const [hours, minutes] = (sendAtTime || '09:00').split(':').map(Number);
+  const now = new Date();
+
+  // Calculate target date: Day 1 = today, Day 2 = tomorrow, etc.
+  const daysOffset = Math.max(0, dayNumber - 1);
+  
+  // Create date in UTC but adjusted for timezone
+  // Simple approach: use Intl to get current timezone offset
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  });
+  const parts = formatter.formatToParts(now);
+  const getPart = (type: string) => parts.find(p => p.type === type)?.value || '0';
+  
+  // Build target date in the account's timezone
+  const localYear = parseInt(getPart('year'));
+  const localMonth = parseInt(getPart('month')) - 1;
+  const localDay = parseInt(getPart('day'));
+  const localHour = parseInt(getPart('hour'));
+  const localMinute = parseInt(getPart('minute'));
+  
+  // Target date
+  const targetDate = new Date(now);
+  targetDate.setDate(targetDate.getDate() + daysOffset);
+  
+  // If Day 1 and the target time already passed today, schedule for tomorrow
+  if (daysOffset === 0 && (localHour > hours || (localHour === hours && localMinute >= minutes))) {
+    targetDate.setDate(targetDate.getDate() + 1);
+  }
+  
+  // Set the time using timezone-aware calculation
+  const targetFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  });
+  const targetParts = targetFormatter.formatToParts(targetDate);
+  const getTargetPart = (type: string) => targetParts.find(p => p.type === type)?.value || '0';
+  
+  // Calculate UTC time for the target local time
+  const currentLocalHour = parseInt(getTargetPart('hour'));
+  const currentLocalMinute = parseInt(getTargetPart('minute'));
+  const hourDiff = hours - currentLocalHour;
+  const minuteDiff = minutes - currentLocalMinute;
+  
+  const result = new Date(targetDate);
+  result.setHours(result.getHours() + hourDiff);
+  result.setMinutes(result.getMinutes() + minuteDiff);
+  result.setSeconds(0);
+  result.setMilliseconds(0);
+  
+  return result;
+}
+
 // Utility: exponential backoff
 async function withBackoff<T>(
   fn: () => Promise<T>,
@@ -212,16 +274,15 @@ export const emailService = {
   }) {
     const cadence = await prisma.emailCadence.findUnique({
       where: { id: data.cadenceId },
-      include: { steps: { orderBy: { ordem: 'asc' }, take: 1 } },
+      include: { steps: { orderBy: { ordem: 'asc' }, take: 1 }, account: { select: { timezone: true } } },
     });
 
     if (!cadence) throw new Error('Cadência não encontrada');
 
     const firstStep = cadence.steps[0];
-    const now = new Date();
-    // Day 1 = send immediately; Day 2 = 24h from now; Day N = (N-1)*24h
+    const timezone = cadence.account?.timezone || 'America/Sao_Paulo';
     const nextSendAt = firstStep
-      ? new Date(now.getTime() + Math.max(0, firstStep.dayNumber - 1) * 24 * 60 * 60 * 1000)
+      ? calculateNextSendAt(firstStep.dayNumber, cadence.sendAtTime, timezone)
       : null;
 
     const enrollments = await Promise.all(
@@ -440,8 +501,8 @@ export const emailService = {
             const nextStep = steps[nextStepIndex];
 
             if (nextStep) {
-              const daysDiff = Math.max(0, nextStep.dayNumber - currentStep.dayNumber);
-              const nextSendAt = new Date(now.getTime() + daysDiff * 24 * 60 * 60 * 1000);
+              const timezone = (await prisma.account.findUnique({ where: { id: enrollment.accountId }, select: { timezone: true } }))?.timezone || 'America/Sao_Paulo';
+              const nextSendAt = calculateNextSendAt(nextStep.dayNumber, enrollment.cadence.sendAtTime, timezone);
               await prisma.emailEnrollment.update({
                 where: { id: enrollment.id },
                 data: { currentStep: nextStepIndex, nextSendAt },
