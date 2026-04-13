@@ -209,12 +209,12 @@ export const emailApiService = {
     return mapCadence(unwrap(res));
   },
 
-  async createCadence(data: { name: string; description?: string; targetStageIds?: string[] }): Promise<EmailCadence> {
+  async createCadence(data: { name: string; description?: string; targetStageIds?: string[]; sendAtTime?: string; startDate?: string }): Promise<EmailCadence> {
     const res = await apiClient.post<any>(API_ENDPOINTS.EMAIL.CADENCES, data);
     return mapCadence(unwrap(res));
   },
 
-  async updateCadence(id: string, data: Partial<{ name: string; description: string; targetStageIds: string[]; active: boolean }>): Promise<EmailCadence> {
+  async updateCadence(id: string, data: Partial<{ name: string; description: string; targetStageIds: string[]; active: boolean; sendAtTime: string; startDate: string }>): Promise<EmailCadence> {
     const res = await apiClient.put<any>(API_ENDPOINTS.EMAIL.CADENCE(id), data);
     return mapCadence(unwrap(res));
   },
