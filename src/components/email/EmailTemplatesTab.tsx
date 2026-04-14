@@ -231,6 +231,15 @@ export default function EmailTemplatesTab() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Email Preview Dialog */}
+      <EmailPreviewDialog
+        open={!!previewTemplate}
+        onOpenChange={(open) => !open && setPreviewTemplate(null)}
+        subject={previewTemplate?.subject || ''}
+        bodyHtml={previewTemplate?.body_html || ''}
+        bodyText={previewTemplate?.body_text || undefined}
+      />
     </div>
   );
 }
