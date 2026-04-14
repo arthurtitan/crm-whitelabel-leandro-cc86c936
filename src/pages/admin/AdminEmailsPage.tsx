@@ -822,6 +822,15 @@ export default function AdminEmailsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Email Preview Dialog */}
+      <EmailPreviewDialog
+        open={!!previewStep}
+        onOpenChange={(open) => !open && setPreviewStep(null)}
+        subject={previewStep?.subject || ''}
+        bodyHtml={previewStep?.body_html || ''}
+        bodyText={previewStep?.body_text || undefined}
+      />
     </div>
   );
 }
