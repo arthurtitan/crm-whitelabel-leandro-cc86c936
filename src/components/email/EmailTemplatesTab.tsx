@@ -7,12 +7,13 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Plus, Edit2, Trash2, FileText, Loader2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, FileText, Loader2, Eye } from 'lucide-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { emailService, type EmailTemplate } from '@/services/email.service';
+import EmailPreviewDialog from '@/components/email/EmailPreviewDialog';
 
 const CATEGORIES = [
   { value: 'onboarding', label: 'Onboarding' },
