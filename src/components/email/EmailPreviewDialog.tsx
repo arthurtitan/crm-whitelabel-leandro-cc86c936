@@ -65,17 +65,21 @@ export default function EmailPreviewDialog({
     }
     setSending(true);
     try {
-      // Get account settings for credentials
       const settings = await emailService.getSettings();
       if (!settings.hasSendgridKey) {
         toast.error('SendGrid não configurado. Configure nas configurações da conta.');
         return;
       }
       const result = await emailService.testSendEmail(
-        '__existing__', // Use existing key from account
+        '__existing__',
         settings.sendgridFromEmail,
         settings.sendgridFromName || 'GoodLeads CRM',
-        testEmail
+        testEmail,
+        {
+          subject: `[TESTE] ${subject}`,
+          html: bodyHtml,
+          text: bodyText,
+        }
       );
       if (result.success) {
         toast.success(`E-mail de teste enviado para ${testEmail}!`);
