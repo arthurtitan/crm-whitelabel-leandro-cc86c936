@@ -56,6 +56,8 @@ export default function AdminEmailsPage() {
   const [showCadenceDialog, setShowCadenceDialog] = useState(false);
   const [showStepDialog, setShowStepDialog] = useState(false);
   const [showRuleDialog, setShowRuleDialog] = useState(false);
+  const [previewStep, setPreviewStep] = useState<EmailCadenceStep | null>(null);
+  const [showRuleDialog, setShowRuleDialog] = useState(false);
   
   const [editingCadence, setEditingCadence] = useState<EmailCadence | null>(null);
   const [editingStep, setEditingStep] = useState<EmailCadenceStep | null>(null);
