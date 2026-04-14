@@ -405,7 +405,7 @@ export const emailApiService = {
   },
 
   async removeCadenceFromCampaign(campaignId: string, cadenceId: string): Promise<void> {
-    await apiClient.post(API_ENDPOINTS.EMAIL.CAMPAIGN_CADENCES(campaignId), { cadenceId, _action: 'remove' });
+    await apiClient.delete(API_ENDPOINTS.EMAIL.CAMPAIGN_CADENCES(campaignId), { data: { cadenceId } });
   },
 
   async getCampaignStats(campaignId: string): Promise<SendStats & { enrollments: number }> {

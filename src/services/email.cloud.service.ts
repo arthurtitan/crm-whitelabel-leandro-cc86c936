@@ -368,4 +368,132 @@ export const emailCloudService = {
     const { error } = await supabase.from('email_cadence_rules').delete().eq('id', id);
     if (error) throw new Error(error.message);
   },
+
+  // ==================== CAMPAIGNS ====================
+  async listCampaigns(): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('email_campaigns' as any)
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw new Error(error.message);
+    return data || [];
+  },
+
+  async createCampaign(input: { name: string; description?: string }): Promise<any> {
+    const { data: profile } = await supabase.from('profiles').select('account_id').single();
+    if (!profile?.account_id) throw new Error('Conta não encontrada');
+    const { data, error } = await supabase
+      .from('email_campaigns' as any)
+      .insert({ account_id: profile.account_id, name: input.name, description: input.description })
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return data;
+  },
+
+  async updateCampaign(id: string, input: Partial<{ name: string; description: string; active: boolean }>): Promise<any> {
+    const { data, error } = await supabase
+      .from('email_campaigns' as any)
+      .update(input)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return data;
+  },
+
+  async deleteCampaign(id: string): Promise<void> {
+    const { error } = await supabase.from('email_campaigns' as any).delete().eq('id', id);
+    if (error) throw new Error(error.message);
+  },
+
+  async addCadenceToCampaign(campaignId: string, cadenceId: string): Promise<void> {
+    const { error } = await supabase
+      .from('email_cadences')
+      .update({ campaign_id: campaignId } as any)
+      .eq('id', cadenceId);
+    if (error) throw new Error(error.message);
+  },
+
+  async removeCadenceFromCampaign(_campaignId: string, cadenceId: string): Promise<void> {
+    const { error } = await supabase
+      .from('email_cadences')
+      .update({ campaign_id: null } as any)
+      .eq('id', cadenceId);
+    if (error) throw new Error(error.message);
+  },
+
+  async getCampaignStats(_campaignId: string): Promise<any> {
+    return { total: 0, sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, failed: 0, enrollments: 0 };
+  },
+
+  // ==================== INBOX ====================
+  async listInboxMessages(filters?: { read?: boolean; limit?: number }): Promise<any[]> {
+    let query = supabase
+      .from('email_inbox_messages' as any)
+      .select('*, contact:contacts(id, nome, email)')
+      .order('received_at', { ascending: false })
+      .limit(filters?.limit || 50);
+    if (filters?.read !== undefined) query = query.eq('read', filters.read);
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+    return data || [];
+  },
+
+  async getInboxMessage(id: string): Promise<any> {
+    const { data, error } = await supabase
+      .from('email_inbox_messages' as any)
+      .select('*, contact:contacts(id, nome, email)')
+      .eq('id', id)
+      .single();
+    if (error) throw new Error(error.message);
+    return data;
+  },
+
+  async markInboxRead(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('email_inbox_messages' as any)
+      .update({ read: true })
+      .eq('id', id);
+    if (error) throw new Error(error.message);
+  },
+
+  async getUnreadCount(): Promise<number> {
+    const { count, error } = await supabase
+      .from('email_inbox_messages' as any)
+      .select('*', { count: 'exact', head: true })
+      .eq('read', false);
+    if (error) throw new Error(error.message);
+    return count || 0;
+  },
+
+  async replyToMessage(_messageId: string, _data: { subject: string; bodyHtml: string; bodyText?: string }): Promise<{ success: boolean }> {
+    return { success: false };
+  },
+
+  async suggestReply(_messageId: string, _instructions?: string): Promise<any> {
+    return { subject: '', bodyHtml: '', bodyText: '' };
+  },
+
+  // ==================== SEARCH ====================
+  async searchByEmail(email: string): Promise<any> {
+    const { data: contact } = await supabase
+      .from('contacts')
+      .select('*')
+      .ilike('email', `%${email}%`)
+      .maybeSingle();
+
+    if (!contact) return { contact: null, enrollments: [], sends: [] };
+
+    const [enrollRes, sendsRes] = await Promise.all([
+      supabase.from('email_enrollments').select('*, cadence:email_cadences(id, name)').eq('contact_id', contact.id),
+      supabase.from('email_sends').select('*').eq('contact_id', contact.id).order('created_at', { ascending: false }).limit(50),
+    ]);
+
+    return {
+      contact,
+      enrollments: enrollRes.data || [],
+      sends: sendsRes.data || [],
+    };
+  },
 };
