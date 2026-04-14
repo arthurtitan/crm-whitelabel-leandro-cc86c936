@@ -134,6 +134,9 @@ export default function EmailTemplatesTab() {
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm font-medium truncate">{t.name}</CardTitle>
                   <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setPreviewTemplate(t)} title="Preview">
+                      <Eye className="w-3 h-3" />
+                    </Button>
                     <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(t)}>
                       <Edit2 className="w-3 h-3" />
                     </Button>
