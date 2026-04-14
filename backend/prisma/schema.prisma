@@ -837,3 +837,54 @@ model EmailSend {
   @@index([status])
   @@map("email_sends")
 }
+
+// ============================================
+// EMAIL CAMPAIGNS
+// ============================================
+model EmailCampaign {
+  id          String  @id @default(uuid()) @db.Uuid
+  accountId   String  @map("account_id") @db.Uuid
+  name        String  @db.VarChar(255)
+  description String?
+  active      Boolean @default(true)
+  createdBy   String? @map("created_by") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  account  Account        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  cadences EmailCadence[]
+
+  @@index([accountId])
+  @@map("email_campaigns")
+}
+
+// ============================================
+// EMAIL INBOX MESSAGES (Inbound replies)
+// ============================================
+model EmailInboxMessage {
+  id           String    @id @default(uuid()) @db.Uuid
+  accountId    String    @map("account_id") @db.Uuid
+  contactId    String?   @map("contact_id") @db.Uuid
+  fromEmail    String    @map("from_email") @db.VarChar(255)
+  toEmail      String    @map("to_email") @db.VarChar(255)
+  subject      String    @db.VarChar(500)
+  bodyText     String?   @map("body_text")
+  bodyHtml     String?   @map("body_html")
+  inReplyTo    String?   @map("in_reply_to") @db.VarChar(500)
+  enrollmentId String?   @map("enrollment_id") @db.Uuid
+  read         Boolean   @default(false)
+  replied      Boolean   @default(false)
+  repliedAt    DateTime? @map("replied_at") @db.Timestamptz
+  receivedAt   DateTime  @default(now()) @map("received_at") @db.Timestamptz
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  account    Account          @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  contact    Contact?         @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  enrollment EmailEnrollment? @relation(fields: [enrollmentId], references: [id], onDelete: SetNull)
+
+  @@index([accountId])
+  @@index([contactId])
+  @@index([read])
+  @@map("email_inbox_messages")
+}
