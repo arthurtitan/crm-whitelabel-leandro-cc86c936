@@ -58,7 +58,8 @@ export const campaignController = {
 
   async removeCadence(req: Request, res: Response, next: NextFunction) {
     try {
-      const data = await campaignService.removeCadence(req.body.cadenceId);
+      const cadenceId = req.body.cadenceId || req.query.cadenceId as string;
+      const data = await campaignService.removeCadence(cadenceId);
       res.json(data);
     } catch (error) { next(error); }
   },
