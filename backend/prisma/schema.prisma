@@ -59,6 +59,8 @@ model Account {
   emailTemplates      EmailTemplate[]
   emailEnrollments    EmailEnrollment[]
   emailSends          EmailSend[]
+  emailCampaigns      EmailCampaign[]
+  emailInboxMessages  EmailInboxMessage[]
 
   @@index([status])
   @@map("accounts")
