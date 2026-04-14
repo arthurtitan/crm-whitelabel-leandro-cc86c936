@@ -315,8 +315,8 @@ export const emailApiService = {
     return unwrap(res);
   },
 
-  async testSendEmail(apiKey: string, fromEmail: string, fromName: string, toEmail: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
-    const res = await apiClient.post<any>(API_ENDPOINTS.EMAIL.TEST_SEND, { apiKey, fromEmail, fromName, toEmail });
+  async testSendEmail(apiKey: string, fromEmail: string, fromName: string, toEmail: string, options?: { subject?: string; html?: string; text?: string }): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    const res = await apiClient.post<any>(API_ENDPOINTS.EMAIL.TEST_SEND, { apiKey, fromEmail, fromName, toEmail, ...options });
     return unwrap(res);
   },
 

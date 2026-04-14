@@ -7,12 +7,13 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Plus, Edit2, Trash2, FileText, Loader2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, FileText, Loader2, Eye } from 'lucide-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { emailService, type EmailTemplate } from '@/services/email.service';
+import EmailPreviewDialog from '@/components/email/EmailPreviewDialog';
 
 const CATEGORIES = [
   { value: 'onboarding', label: 'Onboarding' },
@@ -29,6 +30,7 @@ export default function EmailTemplatesTab() {
   const [showDialog, setShowDialog] = useState(false);
   const [editing, setEditing] = useState<EmailTemplate | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [previewTemplate, setPreviewTemplate] = useState<EmailTemplate | null>(null);
   const [form, setForm] = useState({ name: '', subject: '', bodyHtml: '', bodyText: '', category: '' });
 
   useEffect(() => { loadTemplates(); }, []);
@@ -132,6 +134,9 @@ export default function EmailTemplatesTab() {
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm font-medium truncate">{t.name}</CardTitle>
                   <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setPreviewTemplate(t)} title="Preview">
+                      <Eye className="w-3 h-3" />
+                    </Button>
                     <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(t)}>
                       <Edit2 className="w-3 h-3" />
                     </Button>
@@ -226,6 +231,15 @@ export default function EmailTemplatesTab() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Email Preview Dialog */}
+      <EmailPreviewDialog
+        open={!!previewTemplate}
+        onOpenChange={(open) => !open && setPreviewTemplate(null)}
+        subject={previewTemplate?.subject || ''}
+        bodyHtml={previewTemplate?.body_html || ''}
+        bodyText={previewTemplate?.body_text || undefined}
+      />
     </div>
   );
 }

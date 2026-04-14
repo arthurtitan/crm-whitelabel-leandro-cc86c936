@@ -14,6 +14,7 @@ import {
   Edit2, Trash2, MoreHorizontal, RefreshCw, Loader2, ChevronRight,
   GitBranch, Zap, AlertCircle, FileText, Users
 } from 'lucide-react';
+import EmailPreviewDialog from '@/components/email/EmailPreviewDialog';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
@@ -55,6 +56,7 @@ export default function AdminEmailsPage() {
   const [showCadenceDialog, setShowCadenceDialog] = useState(false);
   const [showStepDialog, setShowStepDialog] = useState(false);
   const [showRuleDialog, setShowRuleDialog] = useState(false);
+  const [previewStep, setPreviewStep] = useState<EmailCadenceStep | null>(null);
   
   const [editingCadence, setEditingCadence] = useState<EmailCadence | null>(null);
   const [editingStep, setEditingStep] = useState<EmailCadenceStep | null>(null);
@@ -447,6 +449,9 @@ export default function AdminEmailsPage() {
                                     </Button>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent>
+                                    <DropdownMenuItem onClick={() => setPreviewStep(step)}>
+                                      <Eye className="w-3 h-3 mr-2" /> Preview
+                                    </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => {
                                       setEditingStep(step);
                                       setStepForm({
@@ -723,6 +728,25 @@ export default function AdminEmailsPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowStepDialog(false)}>Cancelar</Button>
+            {stepForm.bodyHtml.trim() && (
+              <Button
+                variant="secondary"
+                onClick={() => setPreviewStep({
+                  id: editingStep?.id || 'preview',
+                  cadence_id: selectedCadence?.id || '',
+                  day_number: stepForm.dayNumber,
+                  subject: stepForm.subject,
+                  body_html: stepForm.bodyHtml,
+                  body_text: stepForm.bodyText || null,
+                  ordem: 0,
+                  active: true,
+                  created_at: '',
+                  updated_at: '',
+                })}
+              >
+                <Eye className="w-4 h-4 mr-1" /> Preview
+              </Button>
+            )}
             <Button onClick={handleSaveStep} disabled={!stepForm.subject.trim() || !stepForm.bodyHtml.trim()}>
               {editingStep ? 'Salvar' : 'Criar Step'}
             </Button>
@@ -798,6 +822,15 @@ export default function AdminEmailsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Email Preview Dialog */}
+      <EmailPreviewDialog
+        open={!!previewStep}
+        onOpenChange={(open) => !open && setPreviewStep(null)}
+        subject={previewStep?.subject || ''}
+        bodyHtml={previewStep?.body_html || ''}
+        bodyText={previewStep?.body_text || undefined}
+      />
     </div>
   );
 }
