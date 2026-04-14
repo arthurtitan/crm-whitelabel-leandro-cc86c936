@@ -449,6 +449,9 @@ export default function AdminEmailsPage() {
                                     </Button>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent>
+                                    <DropdownMenuItem onClick={() => setPreviewStep(step)}>
+                                      <Eye className="w-3 h-3 mr-2" /> Preview
+                                    </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => {
                                       setEditingStep(step);
                                       setStepForm({
