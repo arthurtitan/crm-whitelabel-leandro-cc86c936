@@ -27,7 +27,7 @@ export const inboxController = {
 
   async getMessage(req: Request, res: Response, next: NextFunction) {
     try {
-      const data = await inboxService.getMessage(req.params.id);
+      const data = await inboxService.getMessage(req.params.id as string);
       if (!data) return res.status(404).json({ error: 'Mensagem não encontrada' });
       res.json(data);
     } catch (error) { next(error); }
@@ -35,7 +35,7 @@ export const inboxController = {
 
   async markRead(req: Request, res: Response, next: NextFunction) {
     try {
-      const data = await inboxService.markRead(req.params.id);
+      const data = await inboxService.markRead(req.params.id as string);
       res.json(data);
     } catch (error) { next(error); }
   },
