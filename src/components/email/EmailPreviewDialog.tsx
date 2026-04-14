@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,40 +23,19 @@ export default function EmailPreviewDialog({
   bodyHtml,
   bodyText,
 }: EmailPreviewDialogProps) {
-  const iframeRef = useRef<HTMLIFrameElement>(null);
   const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>('desktop');
   const [activeTab, setActiveTab] = useState<'preview' | 'html' | 'test'>('preview');
   const [testEmail, setTestEmail] = useState('');
   const [sending, setSending] = useState(false);
 
-  // Replace variables with sample values for preview
-  const previewHtml = bodyHtml
-    .replace(/\{nome\}/g, 'João Silva')
-    .replace(/\{email\}/g, 'joao@exemplo.com')
-    .replace(/\{empresa\}/g, 'Empresa Exemplo');
+  const iframeSrcDoc = useMemo(() => {
+    const preview = bodyHtml
+      .replace(/\{nome\}/g, 'João Silva')
+      .replace(/\{email\}/g, 'joao@exemplo.com')
+      .replace(/\{empresa\}/g, 'Empresa Exemplo');
 
-  useEffect(() => {
-    if (!iframeRef.current || !open) return;
-    const doc = iframeRef.current.contentDocument;
-    if (!doc) return;
-    doc.open();
-    doc.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <style>
-          body { font-family: Arial, sans-serif; margin: 0; padding: 16px; color: #333; background: #fff; }
-          img { max-width: 100%; height: auto; }
-          a { color: #6366F1; }
-        </style>
-      </head>
-      <body>${previewHtml}</body>
-      </html>
-    `);
-    doc.close();
-  }, [previewHtml, open, viewMode]);
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:Arial,sans-serif;margin:0;padding:16px;color:#333;background:#fff}img{max-width:100%;height:auto}a{color:#6366F1}</style></head><body>${preview}</body></html>`;
+  }, [bodyHtml]);
 
   const handleSendTest = async () => {
     if (!testEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(testEmail)) {
@@ -155,9 +134,9 @@ export default function EmailPreviewDialog({
               viewMode === 'mobile' ? 'w-[375px]' : 'w-full'
             }`} style={{ minHeight: '300px', maxHeight: '400px' }}>
               <iframe
-                ref={iframeRef}
                 title="Email Preview"
                 sandbox="allow-same-origin"
+                srcDoc={iframeSrcDoc}
                 className="w-full h-full border-0"
                 style={{ minHeight: '300px', maxHeight: '400px' }}
               />
