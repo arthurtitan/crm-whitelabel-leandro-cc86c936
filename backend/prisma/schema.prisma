@@ -784,7 +784,8 @@ model EmailEnrollment {
   account  Account      @relation(fields: [accountId], references: [id], onDelete: Cascade)
   cadence  EmailCadence @relation(fields: [cadenceId], references: [id], onDelete: Cascade)
   contact  Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  sends    EmailSend[]
+  sends          EmailSend[]
+  inboxMessages  EmailInboxMessage[]
 
   @@index([accountId])
   @@index([cadenceId])
