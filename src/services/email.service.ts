@@ -110,6 +110,41 @@ export interface GeneratedEmail {
   bodyText: string;
 }
 
+export interface EmailCampaign {
+  id: string;
+  account_id: string;
+  name: string;
+  description?: string | null;
+  active: boolean;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+  cadences?: EmailCadence[];
+}
+
+export interface EmailInboxMessage {
+  id: string;
+  account_id: string;
+  contact_id?: string | null;
+  from_email: string;
+  to_email: string;
+  subject: string;
+  body_text?: string | null;
+  body_html?: string | null;
+  read: boolean;
+  replied: boolean;
+  replied_at?: string | null;
+  received_at: string;
+  enrollment_id?: string | null;
+  contact?: { id: string; nome?: string; email?: string };
+}
+
+export interface EmailSearchResult {
+  contact: any | null;
+  enrollments: any[];
+  sends: EmailSend[];
+}
+
 // ==================== MAPPER ====================
 
 function mapCadence(c: any): EmailCadence {
@@ -343,6 +378,75 @@ export const emailApiService = {
 
   async deleteRule(id: string): Promise<void> {
     await apiClient.delete(API_ENDPOINTS.EMAIL.RULE(id));
+  },
+
+  // Campaigns
+  async listCampaigns(): Promise<EmailCampaign[]> {
+    const res = await apiClient.get<any>(API_ENDPOINTS.EMAIL.CAMPAIGNS);
+    return unwrap<any[]>(res) || [];
+  },
+
+  async createCampaign(data: { name: string; description?: string }): Promise<EmailCampaign> {
+    const res = await apiClient.post<any>(API_ENDPOINTS.EMAIL.CAMPAIGNS, data);
+    return unwrap(res);
+  },
+
+  async updateCampaign(id: string, data: Partial<{ name: string; description: string; active: boolean }>): Promise<EmailCampaign> {
+    const res = await apiClient.put<any>(API_ENDPOINTS.EMAIL.CAMPAIGN(id), data);
+    return unwrap(res);
+  },
+
+  async deleteCampaign(id: string): Promise<void> {
+    await apiClient.delete(API_ENDPOINTS.EMAIL.CAMPAIGN(id));
+  },
+
+  async addCadenceToCampaign(campaignId: string, cadenceId: string): Promise<void> {
+    await apiClient.post(API_ENDPOINTS.EMAIL.CAMPAIGN_CADENCES(campaignId), { cadenceId });
+  },
+
+  async removeCadenceFromCampaign(campaignId: string, cadenceId: string): Promise<void> {
+    await apiClient.delete(API_ENDPOINTS.EMAIL.CAMPAIGN_CADENCES(campaignId), { data: { cadenceId } });
+  },
+
+  async getCampaignStats(campaignId: string): Promise<SendStats & { enrollments: number }> {
+    const res = await apiClient.get<any>(API_ENDPOINTS.EMAIL.CAMPAIGN_STATS(campaignId));
+    return unwrap(res);
+  },
+
+  // Inbox
+  async listInboxMessages(filters?: { read?: boolean; limit?: number }): Promise<EmailInboxMessage[]> {
+    const res = await apiClient.get<any>(API_ENDPOINTS.EMAIL.INBOX, { params: filters });
+    return unwrap<any[]>(res) || [];
+  },
+
+  async getInboxMessage(id: string): Promise<EmailInboxMessage> {
+    const res = await apiClient.get<any>(API_ENDPOINTS.EMAIL.INBOX_MESSAGE(id));
+    return unwrap(res);
+  },
+
+  async markInboxRead(id: string): Promise<void> {
+    await apiClient.put(API_ENDPOINTS.EMAIL.INBOX_MARK_READ(id));
+  },
+
+  async getUnreadCount(): Promise<number> {
+    const res = await apiClient.get<any>(API_ENDPOINTS.EMAIL.INBOX_UNREAD);
+    return unwrap<any>(res)?.count || 0;
+  },
+
+  async replyToMessage(messageId: string, data: { subject: string; bodyHtml: string; bodyText?: string }): Promise<{ success: boolean }> {
+    const res = await apiClient.post<any>(API_ENDPOINTS.EMAIL.INBOX_REPLY, { messageId, ...data });
+    return unwrap(res);
+  },
+
+  async suggestReply(messageId: string, instructions?: string): Promise<GeneratedEmail> {
+    const res = await apiClient.post<any>(API_ENDPOINTS.EMAIL.INBOX_SUGGEST_REPLY, { messageId, instructions });
+    return unwrap(res);
+  },
+
+  // Search
+  async searchByEmail(email: string): Promise<EmailSearchResult> {
+    const res = await apiClient.get<any>(API_ENDPOINTS.EMAIL.SEARCH, { params: { email } });
+    return unwrap(res);
   },
 };
 
