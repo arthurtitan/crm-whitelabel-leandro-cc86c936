@@ -30,6 +30,7 @@ export default function EmailTemplatesTab() {
   const [showDialog, setShowDialog] = useState(false);
   const [editing, setEditing] = useState<EmailTemplate | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [previewTemplate, setPreviewTemplate] = useState<EmailTemplate | null>(null);
   const [form, setForm] = useState({ name: '', subject: '', bodyHtml: '', bodyText: '', category: '' });
 
   useEffect(() => { loadTemplates(); }, []);
