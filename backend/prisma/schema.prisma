@@ -152,24 +152,36 @@ model Contact {
   chatwootContactId      Int? @map("chatwoot_contact_id")
   chatwootConversationId Int? @map("chatwoot_conversation_id")
 
+  // Segmentation
+  nicho    String? @db.VarChar(255)
+  cidade   String? @db.VarChar(255)
+  estado   String? @db.VarChar(100)
+
   firstResolvedAt DateTime? @map("first_resolved_at") @db.Timestamptz
+
+  // Follow-up
+  followupCount  Int       @default(0) @map("followup_count")
+  lastFollowupAt DateTime? @map("last_followup_at") @db.Timestamptz
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
-  account          Account           @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  sales            Sale[]
-  leadTags         LeadTag[]
-  tagHistory       TagHistory[]
-  leadNotes        LeadNote[]
-  calendarEvents   CalendarEvent[]
-  emailEnrollments EmailEnrollment[]
-  emailSends       EmailSend[]
+  account            Account              @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  sales              Sale[]
+  leadTags           LeadTag[]
+  tagHistory         TagHistory[]
+  leadNotes          LeadNote[]
+  calendarEvents     CalendarEvent[]
+  emailEnrollments   EmailEnrollment[]
+  emailSends         EmailSend[]
+  emailInboxMessages EmailInboxMessage[]
 
   @@index([accountId])
   @@index([telefone])
   @@index([email])
+  @@index([nicho])
+  @@index([cidade])
   @@map("contacts")
 }
 
@@ -657,17 +669,20 @@ model EmailCadence {
   createdBy      String?  @map("created_by") @db.Uuid
   sendAtTime     String   @default("09:00") @map("send_at_time") @db.VarChar(5)
   startDate      DateTime @default(now()) @map("start_date") @db.Date
+  campaignId     String?  @map("campaign_id") @db.Uuid
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   account      Account              @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  campaign     EmailCampaign?       @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   steps        EmailCadenceStep[]
   enrollments  EmailEnrollment[]
   rulesFrom    EmailCadenceRule[]   @relation("RulesFromCadence")
   rulesTo      EmailCadenceRule[]   @relation("RulesToCadence")
 
   @@index([accountId])
+  @@index([campaignId])
   @@map("email_cadences")
 }
 
