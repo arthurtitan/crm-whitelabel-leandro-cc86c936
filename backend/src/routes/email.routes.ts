@@ -60,4 +60,7 @@ router.post('/test-connection', requirePermission('emails'), (req, res, next) =>
 router.post('/test-send', requirePermission('emails'), (req, res, next) => emailController.testSendEmail(req, res, next));
 router.post('/test-openai', requirePermission('emails'), (req, res, next) => emailController.testOpenai(req, res, next));
 
+// Search
+router.get('/search', requirePermission('emails'), (req, res, next) => emailController.searchByEmail(req, res, next));
+
 export default router;
