@@ -134,9 +134,9 @@ export default function EmailPreviewDialog({
               viewMode === 'mobile' ? 'w-[375px]' : 'w-full'
             }`} style={{ minHeight: '300px', maxHeight: '400px' }}>
               <iframe
-                ref={iframeRef}
                 title="Email Preview"
                 sandbox="allow-same-origin"
+                srcDoc={iframeSrcDoc}
                 className="w-full h-full border-0"
                 style={{ minHeight: '300px', maxHeight: '400px' }}
               />
