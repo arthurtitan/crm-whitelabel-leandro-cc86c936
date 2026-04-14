@@ -728,6 +728,25 @@ export default function AdminEmailsPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowStepDialog(false)}>Cancelar</Button>
+            {stepForm.bodyHtml.trim() && (
+              <Button
+                variant="secondary"
+                onClick={() => setPreviewStep({
+                  id: editingStep?.id || 'preview',
+                  cadence_id: selectedCadence?.id || '',
+                  day_number: stepForm.dayNumber,
+                  subject: stepForm.subject,
+                  body_html: stepForm.bodyHtml,
+                  body_text: stepForm.bodyText || null,
+                  ordem: 0,
+                  active: true,
+                  created_at: '',
+                  updated_at: '',
+                })}
+              >
+                <Eye className="w-4 h-4 mr-1" /> Preview
+              </Button>
+            )}
             <Button onClick={handleSaveStep} disabled={!stepForm.subject.trim() || !stepForm.bodyHtml.trim()}>
               {editingStep ? 'Salvar' : 'Criar Step'}
             </Button>
