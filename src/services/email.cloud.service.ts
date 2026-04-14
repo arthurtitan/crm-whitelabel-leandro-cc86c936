@@ -314,7 +314,7 @@ export const emailCloudService = {
     return { success: false, message: 'Teste de conexão requer backend Express.' };
   },
 
-  async testSendEmail(_apiKey: string, _fromEmail: string, _fromName: string, _toEmail: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  async testSendEmail(_apiKey: string, _fromEmail: string, _fromName: string, _toEmail: string, _options?: { subject?: string; html?: string; text?: string }): Promise<{ success: boolean; messageId?: string; error?: string }> {
     return { success: false, error: 'Envio de teste requer backend Express.' };
   },
 
