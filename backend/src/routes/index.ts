@@ -14,6 +14,7 @@ import eventRoutes from './event.routes';
 import chatwootRoutes from './chatwoot.routes';
 import prospectingRoutes from './prospecting.routes';
 import emailRoutes from './email.routes';
+import emailExtendedRoutes from './email-extended.routes';
 import { Router as LeadTagRouter } from 'express';
 import { contactController } from '../controllers/contact.controller';
 import { authenticate, requirePermission, requireAccountId } from '../middlewares/auth.middleware';
@@ -53,6 +54,7 @@ router.use('/events', eventRoutes);
 router.use('/chatwoot', chatwootRoutes);
 router.use('/prospecting', prospectingRoutes);
 router.use('/email', emailRoutes);
+router.use('/email', emailExtendedRoutes);
 router.use('/lead-tags', leadTagRouter);
 
 export default router;
