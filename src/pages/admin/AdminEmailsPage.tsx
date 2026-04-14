@@ -14,6 +14,7 @@ import {
   Edit2, Trash2, MoreHorizontal, RefreshCw, Loader2, ChevronRight,
   GitBranch, Zap, AlertCircle, FileText, Users
 } from 'lucide-react';
+import EmailPreviewDialog from '@/components/email/EmailPreviewDialog';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
