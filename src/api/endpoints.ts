@@ -197,6 +197,19 @@ export const API_ENDPOINTS = {
     TEST_SENDGRID: '/api/email/test-connection',
     TEST_SEND: '/api/email/test-send',
     TEST_OPENAI: '/api/email/test-openai',
+    SEARCH: '/api/email/search',
+    // Campaigns
+    CAMPAIGNS: '/api/email/campaigns',
+    CAMPAIGN: (id: string) => `/api/email/campaigns/${id}`,
+    CAMPAIGN_CADENCES: (id: string) => `/api/email/campaigns/${id}/cadences`,
+    CAMPAIGN_STATS: (id: string) => `/api/email/campaigns/${id}/stats`,
+    // Inbox
+    INBOX: '/api/email/inbox',
+    INBOX_UNREAD: '/api/email/inbox/unread',
+    INBOX_MESSAGE: (id: string) => `/api/email/inbox/${id}`,
+    INBOX_MARK_READ: (id: string) => `/api/email/inbox/${id}/read`,
+    INBOX_REPLY: '/api/email/inbox/reply',
+    INBOX_SUGGEST_REPLY: '/api/email/inbox/suggest-reply',
   },
 } as const;
 

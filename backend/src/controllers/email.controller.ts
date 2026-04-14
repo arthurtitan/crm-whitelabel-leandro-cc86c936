@@ -347,6 +347,36 @@ export const emailController = {
       res.json(result);
     } catch (error) { next(error); }
   },
+
+  // ==================== SEARCH ====================
+  async searchByEmail(req: Request, res: Response, next: NextFunction) {
+    try {
+      const accountId = getAccountId(req);
+      const email = (req.query.email as string || '').toLowerCase().trim();
+      if (!email) return res.json({ contact: null, enrollments: [], sends: [] });
+
+      const contact = await prisma.contact.findFirst({
+        where: { accountId, email: { contains: email, mode: 'insensitive' } },
+      });
+
+      if (!contact) return res.json({ contact: null, enrollments: [], sends: [] });
+
+      const [enrollments, sends] = await Promise.all([
+        prisma.emailEnrollment.findMany({
+          where: { contactId: contact.id },
+          include: { cadence: { select: { id: true, name: true } } },
+          orderBy: { enrolledAt: 'desc' },
+        }),
+        prisma.emailSend.findMany({
+          where: { contactId: contact.id },
+          orderBy: { createdAt: 'desc' },
+          take: 50,
+        }),
+      ]);
+
+      res.json({ contact, enrollments, sends });
+    } catch (error) { next(error); }
+  },
 };
 
 // ==================== WEBHOOK (public, no auth) ====================
