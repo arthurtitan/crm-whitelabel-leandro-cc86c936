@@ -301,10 +301,40 @@ export const emailController = {
 
   async testSendEmail(req: Request, res: Response, next: NextFunction) {
     try {
+      let apiKey = req.body.apiKey;
+      let fromEmail = req.body.fromEmail;
+      let fromName = req.body.fromName || 'GoodLeads CRM';
+
+      // If using existing credentials from account
+      if (apiKey === '__existing__') {
+        const accountId = getAccountId(req);
+        const creds = await sendgridService.getAccountCredentials(accountId);
+        if (!creds) {
+          return res.json({ success: false, error: 'Credenciais SendGrid não configuradas na conta.' });
+        }
+        apiKey = creds.apiKey;
+        fromEmail = fromEmail || creds.fromEmail;
+        fromName = fromName || creds.fromName;
+      }
+
+      // If custom HTML body is provided, send that instead of the default test template
+      if (req.body.html) {
+        const result = await sendgridService.sendEmail({
+          to: req.body.toEmail,
+          subject: req.body.subject || 'Teste de E-mail - GoodLeads CRM',
+          html: req.body.html,
+          text: req.body.text || undefined,
+          fromEmail,
+          fromName,
+          apiKey,
+        });
+        return res.json(result);
+      }
+
       const result = await sendgridService.sendTestEmail(
-        req.body.apiKey,
-        req.body.fromEmail,
-        req.body.fromName || 'GoodLeads CRM',
+        apiKey,
+        fromEmail,
+        fromName,
         req.body.toEmail,
       );
       res.json(result);
