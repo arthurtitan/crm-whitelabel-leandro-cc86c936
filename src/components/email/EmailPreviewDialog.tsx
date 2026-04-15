@@ -34,7 +34,7 @@ export default function EmailPreviewDialog({
       .replace(/\{email\}/g, 'joao@exemplo.com')
       .replace(/\{empresa\}/g, 'Empresa Exemplo');
 
-    return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:Arial,sans-serif;margin:0;padding:16px;color:#333;background:#fff}img{max-width:100%;height:auto}a{color:#6366F1}</style></head><body>${preview}</body></html>`;
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;margin:0;padding:24px;color:#1a1a1a;background:#fff;font-size:14px;line-height:1.6}img{max-width:100%;height:auto}a{color:#EE3924}h1,h2,h3{margin:0 0 12px;color:#111}p{margin:0 0 16px}</style></head><body>${preview}</body></html>`;
   }, [bodyHtml]);
 
   const handleSendTest = async () => {
@@ -46,7 +46,7 @@ export default function EmailPreviewDialog({
     try {
       const settings = await emailService.getSettings();
       if (!settings.hasSendgridKey) {
-        toast.error('SendGrid não configurado. Configure nas configurações da conta.');
+        toast.error('Credenciais de envio não configuradas.');
         return;
       }
       const result = await emailService.testSendEmail(
@@ -54,11 +54,7 @@ export default function EmailPreviewDialog({
         settings.sendgridFromEmail,
         settings.sendgridFromName || 'GoodLeads CRM',
         testEmail,
-        {
-          subject: `[TESTE] ${subject}`,
-          html: bodyHtml,
-          text: bodyText,
-        }
+        { subject: `[TESTE] ${subject}`, html: bodyHtml, text: bodyText }
       );
       if (result.success) {
         toast.success(`E-mail de teste enviado para ${testEmail}!`);
@@ -86,10 +82,10 @@ export default function EmailPreviewDialog({
         </DialogHeader>
 
         {/* Subject line */}
-        <div className="px-4 py-2 bg-muted/30 rounded-lg border border-border/50">
+        <div className="px-4 py-2.5 bg-muted/30 rounded-lg border border-border/50">
           <div className="flex items-center gap-2 text-sm">
             <span className="text-muted-foreground font-medium">Assunto:</span>
-            <span className="font-medium">{subject}</span>
+            <span className="font-semibold text-foreground">{subject}</span>
           </div>
         </div>
 
@@ -112,40 +108,60 @@ export default function EmailPreviewDialog({
           {/* Preview Tab */}
           <TabsContent value="preview" className="flex-1 flex flex-col min-h-0 mt-4">
             <div className="flex items-center gap-2 mb-3">
-              <Button
-                variant={viewMode === 'desktop' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setViewMode('desktop')}
-              >
-                <Monitor className="w-4 h-4 mr-1" /> Desktop
-              </Button>
-              <Button
-                variant={viewMode === 'mobile' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setViewMode('mobile')}
-              >
-                <Smartphone className="w-4 h-4 mr-1" /> Mobile
-              </Button>
+              <div className="flex items-center bg-muted/30 rounded-lg p-0.5">
+                <Button
+                  variant={viewMode === 'desktop' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="h-7 text-xs px-3"
+                  onClick={() => setViewMode('desktop')}
+                >
+                  <Monitor className="w-3.5 h-3.5 mr-1" /> Desktop
+                </Button>
+                <Button
+                  variant={viewMode === 'mobile' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="h-7 text-xs px-3"
+                  onClick={() => setViewMode('mobile')}
+                >
+                  <Smartphone className="w-3.5 h-3.5 mr-1" /> Mobile
+                </Button>
+              </div>
               <Badge variant="secondary" className="text-[10px] ml-auto">
                 Variáveis substituídas por dados de exemplo
               </Badge>
             </div>
-            <div className={`flex-1 border border-border rounded-lg overflow-hidden bg-white mx-auto transition-all ${
-              viewMode === 'mobile' ? 'w-[375px]' : 'w-full'
-            }`} style={{ minHeight: '300px', maxHeight: '400px' }}>
-              <iframe
-                title="Email Preview"
-                sandbox="allow-same-origin"
-                srcDoc={iframeSrcDoc}
-                className="w-full h-full border-0"
-                style={{ minHeight: '300px', maxHeight: '400px' }}
-              />
+
+            {/* Device Frame */}
+            <div className="flex-1 flex justify-center bg-muted/20 rounded-lg p-4">
+              <div className={`bg-white rounded-xl shadow-lg overflow-hidden border border-border transition-all ${
+                viewMode === 'mobile' ? 'w-[375px]' : 'w-full max-w-[640px]'
+              }`}>
+                {/* Simulated email client header */}
+                <div className="bg-muted/40 px-4 py-2 border-b border-border">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <div className="w-3 h-3 rounded-full bg-destructive/60" />
+                    <div className="w-3 h-3 rounded-full bg-warning/60" />
+                    <div className="w-3 h-3 rounded-full bg-success/60" />
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate">
+                    <span className="font-medium">De:</span> GoodLeads &lt;noreply@empresa.com&gt;
+                  </p>
+                  <p className="text-xs font-medium text-foreground truncate">{subject}</p>
+                </div>
+                <iframe
+                  title="Email Preview"
+                  sandbox="allow-same-origin"
+                  srcDoc={iframeSrcDoc}
+                  className="w-full border-0"
+                  style={{ minHeight: '300px', maxHeight: '380px' }}
+                />
+              </div>
             </div>
           </TabsContent>
 
           {/* HTML Tab */}
           <TabsContent value="html" className="flex-1 min-h-0 mt-4">
-            <pre className="bg-muted/30 border border-border rounded-lg p-4 text-xs overflow-auto max-h-[400px] font-mono whitespace-pre-wrap">
+            <pre className="bg-muted/20 border border-border rounded-lg p-4 text-xs overflow-auto max-h-[400px] font-mono whitespace-pre-wrap text-foreground">
               {bodyHtml}
             </pre>
           </TabsContent>
@@ -153,8 +169,8 @@ export default function EmailPreviewDialog({
           {/* Test Send Tab */}
           <TabsContent value="test" className="mt-4">
             <div className="space-y-4">
-              <div className="p-4 bg-muted/30 rounded-lg border border-border/50">
-                <p className="text-sm text-muted-foreground mb-3">
+              <div className="p-5 bg-muted/20 rounded-lg border border-border/50">
+                <p className="text-sm text-muted-foreground mb-4">
                   Envie este e-mail como teste para verificar a aparência e entrega.
                   <strong className="text-foreground"> Não afeta métricas</strong> da cadência.
                 </p>
@@ -180,7 +196,7 @@ export default function EmailPreviewDialog({
               {bodyText && (
                 <div>
                   <p className="text-sm font-medium mb-2">Versão texto (fallback):</p>
-                  <pre className="bg-muted/30 border border-border rounded-lg p-3 text-xs overflow-auto max-h-[200px] whitespace-pre-wrap">
+                  <pre className="bg-muted/20 border border-border rounded-lg p-3 text-xs overflow-auto max-h-[200px] whitespace-pre-wrap text-foreground">
                     {bodyText}
                   </pre>
                 </div>
