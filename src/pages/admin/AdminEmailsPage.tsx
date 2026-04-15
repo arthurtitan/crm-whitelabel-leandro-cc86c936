@@ -3,18 +3,20 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import {
   Mail, Plus, Send, Eye, MousePointer, AlertTriangle, Clock, Sparkles,
-  Edit2, Trash2, MoreHorizontal, RefreshCw, Loader2, ChevronRight,
-  GitBranch, Zap, AlertCircle, FileText, Users
+  Edit2, Trash2, MoreHorizontal, Loader2, ChevronRight,
+  GitBranch, Zap, AlertCircle, FileText, Users, Inbox
 } from 'lucide-react';
 import EmailPreviewDialog from '@/components/email/EmailPreviewDialog';
+import EmailRichEditor from '@/components/email/EmailRichEditor';
+import EmailAIChat from '@/components/email/EmailAIChat';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
@@ -30,6 +32,7 @@ import {
   type SendStats,
   type GeneratedEmail,
   type EmailSend,
+  type EmailTemplate,
 } from '@/services/email.service';
 import { useBackend } from '@/config/backend.config';
 import { apiClient } from '@/api/client';
@@ -38,11 +41,8 @@ import { supabase } from '@/integrations/supabase/client';
 import EmailTemplatesTab from '@/components/email/EmailTemplatesTab';
 import EmailEnrollmentsTab from '@/components/email/EmailEnrollmentsTab';
 import EmailSendsTab from '@/components/email/EmailSendsTab';
+import EmailInboxTab from '@/components/email/EmailInboxTab';
 
-// ==================== TYPES ====================
-// ==================== COMPONENT ====================
-
-// ==================== COMPONENT ====================
 export default function AdminEmailsPage() {
   // State
   const [cadences, setCadences] = useState<EmailCadence[]>([]);
@@ -51,30 +51,29 @@ export default function AdminEmailsPage() {
   const [loading, setLoading] = useState(true);
   const [credentialsConfigured, setCredentialsConfigured] = useState<boolean | null>(null);
   const [processingQueue, setProcessingQueue] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // Dialogs
   const [showCadenceDialog, setShowCadenceDialog] = useState(false);
   const [showStepDialog, setShowStepDialog] = useState(false);
   const [showRuleDialog, setShowRuleDialog] = useState(false);
   const [previewStep, setPreviewStep] = useState<EmailCadenceStep | null>(null);
-  
+  const [showStepAI, setShowStepAI] = useState(false);
+
   const [editingCadence, setEditingCadence] = useState<EmailCadence | null>(null);
   const [editingStep, setEditingStep] = useState<EmailCadenceStep | null>(null);
 
   // Rules
   const [ruleForm, setRuleForm] = useState({ triggerEvent: 'opened', targetCadenceId: '', delayHours: 0, timeoutHours: 48 });
 
-  // AI Assistant
-  const [aiPrompt, setAiPrompt] = useState('');
-  const [aiGenerating, setAiGenerating] = useState(false);
-  const [generatedEmail, setGeneratedEmail] = useState<GeneratedEmail | null>(null);
-  const [selectedLead, setSelectedLead] = useState<{ nome?: string; email?: string } | null>(null);
+  // Templates for step integration
+  const [templates, setTemplates] = useState<EmailTemplate[]>([]);
 
   // Form state
   const [cadenceForm, setCadenceForm] = useState({ name: '', description: '', sendAtTime: '09:00', startDate: new Date().toISOString().split('T')[0] });
   const [stepForm, setStepForm] = useState({ dayNumber: 1, subject: '', bodyHtml: '', bodyText: '' });
 
-  // ==================== CHECK CREDENTIALS ====================
+  // Check credentials
   const checkCredentials = useCallback(async () => {
     try {
       const settings = await emailService.getSettings();
@@ -84,19 +83,23 @@ export default function AdminEmailsPage() {
     }
   }, []);
 
-  // ==================== DATA LOADING ====================
+  // Data loading
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [cadencesData, statsData] = await Promise.all([
+      const [cadencesData, statsData, templatesData] = await Promise.all([
         emailService.listCadences(),
         emailService.getSendStats().catch(() => ({ total: 0, sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, failed: 0 })),
+        emailService.listTemplates().catch(() => []),
       ]);
       setCadences(cadencesData);
       setStats(statsData);
+      setTemplates(templatesData);
       if (cadencesData.length > 0 && !selectedCadence) {
         setSelectedCadence(cadencesData[0]);
       }
+      // Load unread count
+      emailService.getUnreadCount().then(setUnreadCount).catch(() => {});
     } catch (err: any) {
       console.error('Erro ao carregar dados de e-mail:', err);
     } finally {
@@ -104,13 +107,12 @@ export default function AdminEmailsPage() {
     }
   }, []);
 
-
   useEffect(() => {
     checkCredentials();
     loadData();
   }, [checkCredentials, loadData]);
 
-  // ==================== CADENCE CRUD ====================
+  // Cadence CRUD
   const handleSaveCadence = async () => {
     try {
       if (editingCadence) {
@@ -143,7 +145,7 @@ export default function AdminEmailsPage() {
     }
   };
 
-  // ==================== STEP CRUD ====================
+  // Step CRUD
   const handleSaveStep = async () => {
     if (!selectedCadence) return;
     try {
@@ -157,6 +159,7 @@ export default function AdminEmailsPage() {
       setShowStepDialog(false);
       setStepForm({ dayNumber: 1, subject: '', bodyHtml: '', bodyText: '' });
       setEditingStep(null);
+      setShowStepAI(false);
       const updated = await emailService.getCadence(selectedCadence.id);
       setSelectedCadence(updated);
       setCadences(prev => prev.map(c => c.id === updated.id ? updated : c));
@@ -178,39 +181,21 @@ export default function AdminEmailsPage() {
     }
   };
 
-  // ==================== AI GENERATION ====================
-  const handleGenerateEmail = async () => {
-    if (!aiPrompt.trim()) return;
-    setAiGenerating(true);
-    try {
-      const result = await emailService.generateEmail(aiPrompt, {
-        leadName: selectedLead?.nome,
-        leadEmail: selectedLead?.email,
-        stageName: undefined,
-      });
-      setGeneratedEmail(result);
-      toast.success('E-mail gerado com sucesso!');
-    } catch (err: any) {
-      toast.error(err?.message || 'Erro ao gerar e-mail. Verifique as configurações.');
-    } finally {
-      setAiGenerating(false);
+  // Load template into step
+  const handleLoadTemplate = (templateId: string) => {
+    const t = templates.find(t => t.id === templateId);
+    if (t) {
+      setStepForm(prev => ({
+        ...prev,
+        subject: t.subject,
+        bodyHtml: t.body_html,
+        bodyText: t.body_text || '',
+      }));
+      toast.info(`Template "${t.name}" carregado!`);
     }
   };
 
-  const handleApplyGenerated = () => {
-    if (!generatedEmail) return;
-    setStepForm({
-      dayNumber: stepForm.dayNumber || 1,
-      subject: generatedEmail.subject,
-      bodyHtml: generatedEmail.bodyHtml,
-      bodyText: generatedEmail.bodyText,
-    });
-    setShowStepDialog(true);
-    toast.info('Texto aplicado ao formulário de step!');
-  };
-
-
-  // ==================== RULES ====================
+  // Rules
   const handleSaveRule = async () => {
     if (!selectedCadence || !ruleForm.targetCadenceId) return;
     try {
@@ -239,7 +224,7 @@ export default function AdminEmailsPage() {
     }
   };
 
-  // ==================== PROCESS QUEUE ====================
+  // Process Queue
   const handleProcessQueue = async () => {
     if (!selectedCadence) {
       toast.info('Selecione uma cadência antes de disparar.');
@@ -302,7 +287,7 @@ export default function AdminEmailsPage() {
         </Button>
       </div>
 
-      {/* Credentials Warning (white-label) */}
+      {/* Credentials Warning */}
       {credentialsConfigured === false && (
         <Card className="border-amber-500/50 bg-amber-500/5">
           <CardContent className="p-4 flex items-center gap-3">
@@ -339,7 +324,7 @@ export default function AdminEmailsPage() {
 
       {/* Tabs */}
       <Tabs defaultValue="cadences" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="cadences" className="flex items-center gap-2">
             <Clock className="w-4 h-4" />
             Cadências
@@ -356,13 +341,21 @@ export default function AdminEmailsPage() {
             <Send className="w-4 h-4" />
             Envios
           </TabsTrigger>
+          <TabsTrigger value="inbox" className="flex items-center gap-2 relative">
+            <Inbox className="w-4 h-4" />
+            Inbox
+            {unreadCount > 0 && (
+              <Badge variant="destructive" className="text-[10px] h-4 min-w-[16px] px-1 absolute -top-1 -right-1">
+                {unreadCount}
+              </Badge>
+            )}
+          </TabsTrigger>
         </TabsList>
 
-        {/* ==================== TAB: CADENCES ==================== */}
+        {/* TAB: CADENCES */}
         <TabsContent value="cadences" className="mt-6">
           <div className="grid lg:grid-cols-3 gap-6">
-            {/* LEFT: Cadence + Funnel */}
-            <div className="lg:col-span-2 space-y-6">
+            <div className="lg:col-span-3 space-y-6">
               {/* Cadence Section */}
               <Card className="card-gradient border-border/50">
                 <CardHeader className="pb-3">
@@ -460,6 +453,7 @@ export default function AdminEmailsPage() {
                                         bodyHtml: step.body_html,
                                         bodyText: step.body_text || '',
                                       });
+                                      setShowStepAI(false);
                                       setShowStepDialog(true);
                                     }}>
                                       <Edit2 className="w-3 h-3 mr-2" /> Editar
@@ -484,6 +478,7 @@ export default function AdminEmailsPage() {
                             setEditingStep(null);
                             const nextDay = steps.length > 0 ? Math.max(...steps.map(s => s.day_number)) + 2 : 1;
                             setStepForm({ dayNumber: nextDay, subject: '', bodyHtml: '', bodyText: '' });
+                            setShowStepAI(false);
                             setShowStepDialog(true);
                           }}
                         >
@@ -547,91 +542,28 @@ export default function AdminEmailsPage() {
                   </CardContent>
                 </Card>
               )}
-
-            </div>
-
-            {/* RIGHT: AI Assistant */}
-            <div className="space-y-4">
-              <Card className="card-gradient border-border/50">
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-violet-400" />
-                    Assistente de IA
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">Gere e-mails personalizados com IA</p>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {generatedEmail ? (
-                    <div className="space-y-3">
-                      <div className="text-xs text-muted-foreground">PRÉVIA DO E-MAIL</div>
-                      <div className="space-y-2">
-                        <div className="flex gap-2 text-sm">
-                          <span className="text-muted-foreground">Para:</span>
-                          <span>{selectedLead?.email || '[Lead selecionado]'}</span>
-                        </div>
-                        <div className="flex gap-2 text-sm">
-                          <span className="text-muted-foreground">Assunto:</span>
-                          <span className="font-medium">{generatedEmail.subject}</span>
-                        </div>
-                      </div>
-                      <Separator />
-                      <div
-                        className="prose prose-sm max-w-none text-sm p-3 rounded-lg bg-background border border-border max-h-[250px] overflow-y-auto"
-                        dangerouslySetInnerHTML={{ __html: generatedEmail.bodyHtml }}
-                      />
-                      <div className="flex flex-wrap gap-2">
-                        <Badge variant="outline" className="cursor-pointer hover:bg-muted" onClick={() => setAiPrompt('Reescreva mais formal')}>Mais formal</Badge>
-                        <Badge variant="outline" className="cursor-pointer hover:bg-muted" onClick={() => setAiPrompt('Reescreva mais curto')}>Mais curto</Badge>
-                        <Badge variant="outline" className="cursor-pointer hover:bg-muted" onClick={() => setAiPrompt('Adicione um CTA claro')}>Adicionar CTA</Badge>
-                      </div>
-                      <Button className="w-full" onClick={handleApplyGenerated}>
-                        <Send className="w-4 h-4 mr-2" />
-                        Usar nesta cadência
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="p-4 rounded-lg bg-muted/30 border border-border/50 text-center">
-                      <p className="text-xs text-muted-foreground mb-2">Gere um e-mail descrevendo o que deseja:</p>
-                      <p className="text-sm italic text-muted-foreground">"Crie um e-mail de apresentação para clínicas de estética"</p>
-                    </div>
-                  )}
-
-                  <div className="space-y-2">
-                    <Textarea
-                      placeholder="Ex: lead do setor educacional, tom formal..."
-                      value={aiPrompt}
-                      onChange={(e) => setAiPrompt(e.target.value)}
-                      rows={2}
-                      className="resize-none"
-                    />
-                    <Button
-                      className="w-full"
-                      onClick={handleGenerateEmail}
-                      disabled={aiGenerating || !aiPrompt.trim()}
-                    >
-                      {aiGenerating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
-                      {aiGenerating ? 'Gerando...' : 'Gerar'}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
             </div>
           </div>
         </TabsContent>
 
-        {/* ==================== TAB: TEMPLATES ==================== */}
+        {/* TAB: TEMPLATES */}
         <TabsContent value="templates" className="mt-6">
           <EmailTemplatesTab />
         </TabsContent>
 
-        {/* ==================== TAB: ENROLLMENTS ==================== */}
+        {/* TAB: ENROLLMENTS */}
         <TabsContent value="enrollments" className="mt-6">
           <EmailEnrollmentsTab />
         </TabsContent>
 
-        {/* ==================== TAB: SENDS ==================== */}
+        {/* TAB: SENDS */}
         <TabsContent value="sends" className="mt-6">
           <EmailSendsTab />
+        </TabsContent>
+
+        {/* TAB: INBOX */}
+        <TabsContent value="inbox" className="mt-6">
+          <EmailInboxTab />
         </TabsContent>
       </Tabs>
 
@@ -691,43 +623,94 @@ export default function AdminEmailsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Step Dialog */}
-      <Dialog open={showStepDialog} onOpenChange={setShowStepDialog}>
-        <DialogContent className="max-w-lg">
+      {/* Step Dialog - with Rich Editor, Template Integration & AI */}
+      <Dialog open={showStepDialog} onOpenChange={(open) => { setShowStepDialog(open); if (!open) setShowStepAI(false); }}>
+        <DialogContent className={`${showStepAI ? 'max-w-5xl' : 'max-w-2xl'} max-h-[90vh] overflow-hidden flex flex-col`}>
           <DialogHeader>
-            <DialogTitle>{editingStep ? 'Editar Step' : 'Novo Step'}</DialogTitle>
+            <DialogTitle className="flex items-center justify-between">
+              <span>{editingStep ? 'Editar Step' : 'Novo Step'}</span>
+              <Button
+                variant={showStepAI ? 'default' : 'outline'}
+                size="sm"
+                className="text-xs"
+                onClick={() => setShowStepAI(!showStepAI)}
+              >
+                <Sparkles className="w-3.5 h-3.5 mr-1" />
+                {showStepAI ? 'Fechar IA' : 'Gerar com IA'}
+              </Button>
+            </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Dia do envio</label>
-              <Input
-                type="number"
-                min={1}
-                value={stepForm.dayNumber}
-                onChange={(e) => setStepForm(prev => ({ ...prev, dayNumber: parseInt(e.target.value) || 1 }))}
-              />
+
+          <div className={`flex-1 min-h-0 overflow-y-auto ${showStepAI ? 'grid grid-cols-[1fr_320px] gap-0' : ''}`}>
+            <div className={`space-y-4 ${showStepAI ? 'pr-4 overflow-y-auto' : ''}`}>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-medium">Dia do envio</label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={stepForm.dayNumber}
+                    onChange={(e) => setStepForm(prev => ({ ...prev, dayNumber: parseInt(e.target.value) || 1 }))}
+                  />
+                </div>
+                {templates.length > 0 && (
+                  <div>
+                    <label className="text-sm font-medium">Usar template como base</label>
+                    <Select onValueChange={handleLoadTemplate}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecionar template..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {templates.map(t => (
+                          <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="text-sm font-medium">Assunto</label>
+                <Input
+                  value={stepForm.subject}
+                  onChange={(e) => setStepForm(prev => ({ ...prev, subject: e.target.value }))}
+                  placeholder="Assunto do e-mail"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Corpo do e-mail</label>
+                <EmailRichEditor
+                  value={stepForm.bodyHtml}
+                  onChange={(html) => setStepForm(prev => ({ ...prev, bodyHtml: html }))}
+                  placeholder="Comece a escrever o corpo do e-mail..."
+                  minHeight="220px"
+                />
+              </div>
             </div>
-            <div>
-              <label className="text-sm font-medium">Assunto</label>
-              <Input
-                value={stepForm.subject}
-                onChange={(e) => setStepForm(prev => ({ ...prev, subject: e.target.value }))}
-                placeholder="Assunto do e-mail"
+
+            {/* AI Chat Panel */}
+            {showStepAI && (
+              <EmailAIChat
+                onApply={(email) => {
+                  setStepForm(prev => ({
+                    ...prev,
+                    subject: email.subject || prev.subject,
+                    bodyHtml: email.bodyHtml,
+                    bodyText: email.bodyText,
+                  }));
+                  toast.info('Conteúdo da IA aplicado ao step!');
+                }}
+                onClose={() => setShowStepAI(false)}
+                context={{
+                  currentSubject: stepForm.subject,
+                  currentBodyHtml: stepForm.bodyHtml,
+                }}
               />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Corpo do e-mail (HTML)</label>
-              <Textarea
-                value={stepForm.bodyHtml}
-                onChange={(e) => setStepForm(prev => ({ ...prev, bodyHtml: e.target.value }))}
-                placeholder="<p>Olá {nome}, ...</p>"
-                rows={6}
-              />
-              <p className="text-xs text-muted-foreground mt-1">Use {'{'} nome {'}'} e {'{'} email {'}'} como variáveis.</p>
-            </div>
+            )}
           </div>
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowStepDialog(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => { setShowStepDialog(false); setShowStepAI(false); }}>Cancelar</Button>
             {stepForm.bodyHtml.trim() && (
               <Button
                 variant="secondary"
@@ -753,7 +736,6 @@ export default function AdminEmailsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
 
       {/* Rule Dialog */}
       <Dialog open={showRuleDialog} onOpenChange={setShowRuleDialog}>
