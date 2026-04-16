@@ -352,6 +352,80 @@ export type Database = {
           },
         ]
       }
+      email_audience_contacts: {
+        Row: {
+          audience_id: string
+          contact_id: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          audience_id: string
+          contact_id: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          audience_id?: string
+          contact_id?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_audience_contacts_audience_id_fkey"
+            columns: ["audience_id"]
+            isOneToOne: false
+            referencedRelation: "email_audiences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_audience_contacts_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_audiences: {
+        Row: {
+          account_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_audiences_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_cadence_rules: {
         Row: {
           active: boolean
@@ -514,6 +588,7 @@ export type Database = {
         Row: {
           account_id: string
           active: boolean
+          audience_id: string | null
           created_at: string
           created_by: string | null
           description: string | null
@@ -524,6 +599,7 @@ export type Database = {
         Insert: {
           account_id: string
           active?: boolean
+          audience_id?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -534,6 +610,7 @@ export type Database = {
         Update: {
           account_id?: string
           active?: boolean
+          audience_id?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -547,6 +624,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_campaigns_audience_id_fkey"
+            columns: ["audience_id"]
+            isOneToOne: false
+            referencedRelation: "email_audiences"
             referencedColumns: ["id"]
           },
         ]
