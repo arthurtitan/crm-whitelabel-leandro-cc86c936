@@ -893,3 +893,43 @@ model EmailInboxMessage {
   @@index([read])
   @@map("email_inbox_messages")
 }
+
+// ============================================
+// EMAIL AUDIENCES
+// ============================================
+model EmailAudience {
+  id          String  @id @default(uuid()) @db.Uuid
+  accountId   String  @map("account_id") @db.Uuid
+  name        String  @db.VarChar(255)
+  description String?
+  createdBy   String? @map("created_by") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  account   Account                @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  contacts  EmailAudienceContact[]
+  campaigns EmailCampaign[]
+
+  @@index([accountId])
+  @@map("email_audiences")
+}
+
+// ============================================
+// EMAIL AUDIENCE CONTACTS (junction)
+// ============================================
+model EmailAudienceContact {
+  id         String @id @default(uuid()) @db.Uuid
+  audienceId String @map("audience_id") @db.Uuid
+  contactId  String @map("contact_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  audience EmailAudience @relation(fields: [audienceId], references: [id], onDelete: Cascade)
+  contact  Contact       @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([audienceId, contactId])
+  @@index([audienceId])
+  @@index([contactId])
+  @@map("email_audience_contacts")
+}
