@@ -61,6 +61,7 @@ model Account {
   emailSends          EmailSend[]
   emailCampaigns      EmailCampaign[]
   emailInboxMessages  EmailInboxMessage[]
+  emailAudiences      EmailAudience[]
 
   @@index([status])
   @@map("accounts")
@@ -178,6 +179,7 @@ model Contact {
   emailEnrollments   EmailEnrollment[]
   emailSends         EmailSend[]
   emailInboxMessages EmailInboxMessage[]
+  emailAudienceContacts EmailAudienceContact[]
 
   @@index([accountId])
   @@index([telefone])
