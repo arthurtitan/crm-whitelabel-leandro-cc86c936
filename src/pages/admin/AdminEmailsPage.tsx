@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import {
   Mail, Plus, Send, Eye, MousePointer, AlertTriangle, Clock, Sparkles,
   Edit2, Trash2, MoreHorizontal, Loader2, ChevronRight,
-  GitBranch, Zap, AlertCircle, FileText, Users, Inbox
+  GitBranch, Zap, AlertCircle, FileText, Users, Inbox, FolderOpen
 } from 'lucide-react';
 import EmailPreviewDialog from '@/components/email/EmailPreviewDialog';
 import EmailRichEditor from '@/components/email/EmailRichEditor';
