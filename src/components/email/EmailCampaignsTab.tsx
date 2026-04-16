@@ -100,23 +100,22 @@ export default function EmailCampaignsTab() {
       ]);
 
       // Load audiences (only available in Cloud mode)
+      let audWithCounts: Audience[] = [];
       if (!useBackend) {
         const { data: audData } = await supabase
           .from('email_audiences')
           .select('id, name')
           .eq('account_id', accountId);
         const audList: Audience[] = (audData || []);
-        const audWithCounts = await Promise.all(audList.map(async (a) => {
+        audWithCounts = await Promise.all(audList.map(async (a) => {
           const { count } = await supabase
             .from('email_audience_contacts')
             .select('*', { count: 'exact', head: true })
             .eq('audience_id', a.id);
           return { ...a, contact_count: count || 0 };
         }));
-        setAudiences(audWithCounts);
-      } else {
-        setAudiences([]);
       }
+      setAudiences(audWithCounts);
 
       // Enrich campaigns
       const enriched: CampaignFull[] = await Promise.all(campaignsData.map(async (camp: any) => {
