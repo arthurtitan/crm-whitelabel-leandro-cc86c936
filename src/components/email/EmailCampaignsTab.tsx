@@ -642,6 +642,7 @@ export default function EmailCampaignsTab() {
                   setInnerTab('cadences');
                   toast.info('Conteúdo aplicado — configure o step e salve!');
                 }}
+                onClose={() => setInnerTab('cadences')}
                 context={{ currentSubject: '', currentBodyHtml: '' }}
               />
             </CardContent>
