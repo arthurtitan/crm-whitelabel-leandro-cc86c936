@@ -64,7 +64,7 @@ export default function EmailAudiencesTab() {
   const loadAudiences = useCallback(async () => {
     setLoading(true);
     try {
-      const accountId = await getAccountId();
+      
       const { data, error } = await supabase
         .from('email_audiences')
         .select('*')
@@ -116,7 +116,7 @@ export default function EmailAudiencesTab() {
   // CRUD
   const handleSave = async () => {
     try {
-      const accountId = await getAccountId();
+      
       if (editingAudience) {
         const { error } = await supabase
           .from('email_audiences')
@@ -160,7 +160,7 @@ export default function EmailAudiencesTab() {
     if (query.length < 2) { setSearchResults([]); return; }
     setSearchLoading(true);
     try {
-      const accountId = await getAccountId();
+      
       const { data } = await supabase
         .from('contacts')
         .select('id, nome, email, telefone')
@@ -242,7 +242,7 @@ export default function EmailAudiencesTab() {
     if (!selectedAudience || csvData.length === 0) return;
     setImportLoading(true);
     try {
-      const accountId = await getAccountId();
+      
       // Create or find contacts by email
       let added = 0;
       for (const row of csvData) {

@@ -91,7 +91,7 @@ export default function EmailCampaignsTab() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const accountId = await getAccountId();
+      
       const [campaignsData, cadencesData, templatesData] = await Promise.all([
         emailService.listCampaigns(),
         emailService.listCadences(),
