@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useContext } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,7 @@ import {
   Plus, Edit2, Trash2, Loader2, Users, Upload, UserPlus, Search, X
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { AuthContext } from '@/contexts/AuthContext';
 
 interface Audience {
   id: string;
@@ -29,14 +30,6 @@ interface Contact {
   nome: string | null;
   email: string | null;
   telefone: string | null;
-}
-
-async function getAccountId(): Promise<string> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Não autenticado');
-  const { data: profile } = await supabase.from('profiles').select('account_id').eq('user_id', user.id).single();
-  if (!profile?.account_id) throw new Error('Conta não encontrada');
-  return profile.account_id;
 }
 
 export default function EmailAudiencesTab() {
