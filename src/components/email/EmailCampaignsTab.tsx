@@ -32,6 +32,7 @@ import {
   type SendStats,
 } from '@/services/email.service';
 import { supabase } from '@/integrations/supabase/client';
+import { useBackend } from '@/config/backend.config';
 import { AuthContext } from '@/contexts/AuthContext';
 import EmailPreviewDialog from '@/components/email/EmailPreviewDialog';
 import EmailRichEditor from '@/components/email/EmailRichEditor';
@@ -98,21 +99,22 @@ export default function EmailCampaignsTab() {
         emailService.listTemplates().catch(() => []),
       ]);
 
-      // Load audiences
-      const { data: audData } = await supabase
-        .from('email_audiences')
-        .select('id, name')
-        .eq('account_id', accountId);
-      const audList: Audience[] = (audData || []);
-
-      // Get audience contact counts
-      const audWithCounts = await Promise.all(audList.map(async (a) => {
-        const { count } = await supabase
-          .from('email_audience_contacts')
-          .select('*', { count: 'exact', head: true })
-          .eq('audience_id', a.id);
-        return { ...a, contact_count: count || 0 };
-      }));
+      // Load audiences (only available in Cloud mode)
+      let audWithCounts: Audience[] = [];
+      if (!useBackend) {
+        const { data: audData } = await supabase
+          .from('email_audiences')
+          .select('id, name')
+          .eq('account_id', accountId);
+        const audList: Audience[] = (audData || []);
+        audWithCounts = await Promise.all(audList.map(async (a) => {
+          const { count } = await supabase
+            .from('email_audience_contacts')
+            .select('*', { count: 'exact', head: true })
+            .eq('audience_id', a.id);
+          return { ...a, contact_count: count || 0 };
+        }));
+      }
       setAudiences(audWithCounts);
 
       // Enrich campaigns
@@ -154,14 +156,14 @@ export default function EmailCampaignsTab() {
     try {
       if (editingCampaign) {
         await emailService.updateCampaign(editingCampaign.id, { name: form.name, description: form.description });
-        // Update audience separately
-        if (form.audienceId) {
+        // Update audience separately (Cloud only)
+        if (form.audienceId && !useBackend) {
           await supabase.from('email_campaigns').update({ audience_id: form.audienceId } as any).eq('id', editingCampaign.id);
         }
         toast.success('Campanha atualizada!');
       } else {
         const created = await emailService.createCampaign({ name: form.name, description: form.description });
-        if (form.audienceId) {
+        if (form.audienceId && !useBackend) {
           await supabase.from('email_campaigns').update({ audience_id: form.audienceId } as any).eq('id', created.id);
         }
         toast.success('Campanha criada!');
