@@ -13,15 +13,19 @@ import { toast } from 'sonner';
 import {
   Plus, Edit2, Trash2, Loader2, Users, Upload, UserPlus, Search, X
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { AuthContext } from '@/contexts/AuthContext';
+import { useBackend } from '@/config/backend.config';
+import { apiClient } from '@/api/client';
+import { API_ENDPOINTS } from '@/api/endpoints';
 
 interface Audience {
   id: string;
-  account_id: string;
+  account_id?: string;
+  accountId?: string;
   name: string;
   description: string | null;
-  created_at: string;
+  created_at?: string;
+  createdAt?: string;
   contact_count?: number;
 }
 
@@ -31,6 +35,175 @@ interface Contact {
   email: string | null;
   telefone: string | null;
 }
+
+// ==================== API LAYER ====================
+
+const audienceApi = {
+  async list(accountId: string): Promise<Audience[]> {
+    if (useBackend) {
+      const res = await apiClient.get<any>(API_ENDPOINTS.EMAIL.AUDIENCES);
+      const data = res?.data ?? res;
+      return (Array.isArray(data) ? data : []).map(normalizeAudience);
+    }
+    // Cloud mode - dynamic import to avoid pulling supabase in backend mode
+    const { supabase } = await import('@/integrations/supabase/client');
+    const { data, error } = await supabase
+      .from('email_audiences')
+      .select('*')
+      .eq('account_id', accountId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    const enriched = await Promise.all((data || []).map(async (a: any) => {
+      const { count } = await supabase
+        .from('email_audience_contacts')
+        .select('*', { count: 'exact', head: true })
+        .eq('audience_id', a.id);
+      return { ...a, contact_count: count || 0 };
+    }));
+    return enriched.map(normalizeAudience);
+  },
+
+  async create(accountId: string, form: { name: string; description: string }): Promise<void> {
+    if (useBackend) {
+      await apiClient.post(API_ENDPOINTS.EMAIL.AUDIENCES, form);
+      return;
+    }
+    const { supabase } = await import('@/integrations/supabase/client');
+    const { error } = await supabase
+      .from('email_audiences')
+      .insert({ account_id: accountId, name: form.name, description: form.description || null });
+    if (error) throw error;
+  },
+
+  async update(id: string, form: { name: string; description: string }): Promise<void> {
+    if (useBackend) {
+      await apiClient.put(API_ENDPOINTS.EMAIL.AUDIENCE(id), { name: form.name, description: form.description || null });
+      return;
+    }
+    const { supabase } = await import('@/integrations/supabase/client');
+    const { error } = await supabase
+      .from('email_audiences')
+      .update({ name: form.name, description: form.description || null })
+      .eq('id', id);
+    if (error) throw error;
+  },
+
+  async delete(id: string): Promise<void> {
+    if (useBackend) {
+      await apiClient.delete(API_ENDPOINTS.EMAIL.AUDIENCE(id));
+      return;
+    }
+    const { supabase } = await import('@/integrations/supabase/client');
+    const { error } = await supabase.from('email_audiences').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  async listContacts(audienceId: string): Promise<Contact[]> {
+    if (useBackend) {
+      const res = await apiClient.get<any>(API_ENDPOINTS.EMAIL.AUDIENCE_CONTACTS(audienceId));
+      const data = res?.data ?? res;
+      return Array.isArray(data) ? data : [];
+    }
+    const { supabase } = await import('@/integrations/supabase/client');
+    const { data, error } = await supabase
+      .from('email_audience_contacts')
+      .select('contact_id, contacts:contact_id(id, nome, email, telefone)')
+      .eq('audience_id', audienceId);
+    if (error) throw error;
+    return (data || []).map((r: any) => r.contacts).filter(Boolean);
+  },
+
+  async addContacts(audienceId: string, contactIds: string[]): Promise<void> {
+    if (useBackend) {
+      await apiClient.post(API_ENDPOINTS.EMAIL.AUDIENCE_CONTACTS(audienceId), { contactIds });
+      return;
+    }
+    const { supabase } = await import('@/integrations/supabase/client');
+    const inserts = contactIds.map(contactId => ({ audience_id: audienceId, contact_id: contactId }));
+    const { error } = await supabase.from('email_audience_contacts').insert(inserts);
+    if (error) throw error;
+  },
+
+  async removeContact(audienceId: string, contactId: string): Promise<void> {
+    if (useBackend) {
+      await apiClient.delete(API_ENDPOINTS.EMAIL.AUDIENCE_REMOVE_CONTACT(audienceId, contactId));
+      return;
+    }
+    const { supabase } = await import('@/integrations/supabase/client');
+    const { error } = await supabase
+      .from('email_audience_contacts')
+      .delete()
+      .eq('audience_id', audienceId)
+      .eq('contact_id', contactId);
+    if (error) throw error;
+  },
+
+  async importCsv(audienceId: string, accountId: string, rows: { nome: string; email: string }[]): Promise<number> {
+    if (useBackend) {
+      const res = await apiClient.post<any>(API_ENDPOINTS.EMAIL.AUDIENCE_IMPORT(audienceId), { rows });
+      const data = res?.data ?? res;
+      return data?.added || 0;
+    }
+    const { supabase } = await import('@/integrations/supabase/client');
+    let added = 0;
+    for (const row of rows) {
+      let { data: existing } = await supabase
+        .from('contacts')
+        .select('id')
+        .eq('account_id', accountId)
+        .ilike('email', row.email)
+        .maybeSingle();
+      let contactId: string;
+      if (existing) {
+        contactId = existing.id;
+      } else {
+        const { data: created, error } = await supabase
+          .from('contacts')
+          .insert({ account_id: accountId, nome: row.nome || null, email: row.email })
+          .select('id')
+          .single();
+        if (error) continue;
+        contactId = created.id;
+      }
+      const { error: linkErr } = await supabase
+        .from('email_audience_contacts')
+        .upsert({ audience_id: audienceId, contact_id: contactId }, { onConflict: 'audience_id,contact_id' });
+      if (!linkErr) added++;
+    }
+    return added;
+  },
+
+  async searchContacts(accountId: string, query: string, excludeIds: string[]): Promise<Contact[]> {
+    if (useBackend) {
+      const res = await apiClient.get<any>('/api/contacts', { params: { search: query, limit: 20 } });
+      const data = res?.data ?? res;
+      const list = Array.isArray(data) ? data : (data?.data || []);
+      return list.filter((c: any) => !excludeIds.includes(c.id));
+    }
+    const { supabase } = await import('@/integrations/supabase/client');
+    const { data } = await supabase
+      .from('contacts')
+      .select('id, nome, email, telefone')
+      .eq('account_id', accountId)
+      .or(`nome.ilike.%${query}%,email.ilike.%${query}%,telefone.ilike.%${query}%`)
+      .limit(20);
+    const existingIds = new Set(excludeIds);
+    return (data || []).filter((c: any) => !existingIds.has(c.id));
+  },
+};
+
+function normalizeAudience(a: any): Audience {
+  return {
+    id: a.id,
+    account_id: a.account_id ?? a.accountId,
+    name: a.name,
+    description: a.description,
+    created_at: a.created_at ?? a.createdAt,
+    contact_count: a.contact_count ?? a._count?.contacts ?? 0,
+  };
+}
+
+// ==================== COMPONENT ====================
 
 export default function EmailAudiencesTab() {
   const auth = useContext(AuthContext);
@@ -64,45 +237,25 @@ export default function EmailAudiencesTab() {
   const loadAudiences = useCallback(async () => {
     setLoading(true);
     try {
-      
-      const { data, error } = await supabase
-        .from('email_audiences')
-        .select('*')
-        .eq('account_id', accountId)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-
-      // Get contact counts
-      const enriched = await Promise.all((data || []).map(async (a) => {
-        const { count } = await supabase
-          .from('email_audience_contacts')
-          .select('*', { count: 'exact', head: true })
-          .eq('audience_id', a.id);
-        return { ...a, contact_count: count || 0 };
-      }));
-
-      setAudiences(enriched);
-      if (enriched.length > 0 && !selectedAudience) {
-        setSelectedAudience(enriched[0]);
+      const data = await audienceApi.list(accountId);
+      setAudiences(data);
+      if (data.length > 0 && !selectedAudience) {
+        setSelectedAudience(data[0]);
       }
     } catch (err: any) {
-      console.error(err);
+      console.error('loadAudiences error:', err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [accountId]);
 
   const loadAudienceContacts = useCallback(async (audienceId: string) => {
     setLoadingContacts(true);
     try {
-      const { data, error } = await supabase
-        .from('email_audience_contacts')
-        .select('contact_id, contacts:contact_id(id, nome, email, telefone)')
-        .eq('audience_id', audienceId);
-      if (error) throw error;
-      setAudienceContacts((data || []).map((r: any) => r.contacts).filter(Boolean));
+      const data = await audienceApi.listContacts(audienceId);
+      setAudienceContacts(data);
     } catch (err: any) {
-      console.error(err);
+      console.error('loadAudienceContacts error:', err);
     } finally {
       setLoadingContacts(false);
     }
@@ -116,19 +269,11 @@ export default function EmailAudiencesTab() {
   // CRUD
   const handleSave = async () => {
     try {
-      
       if (editingAudience) {
-        const { error } = await supabase
-          .from('email_audiences')
-          .update({ name: form.name, description: form.description || null })
-          .eq('id', editingAudience.id);
-        if (error) throw error;
+        await audienceApi.update(editingAudience.id, form);
         toast.success('Público atualizado!');
       } else {
-        const { error } = await supabase
-          .from('email_audiences')
-          .insert({ account_id: accountId, name: form.name, description: form.description || null });
-        if (error) throw error;
+        await audienceApi.create(accountId, form);
         toast.success('Público criado!');
       }
       setShowCreateDialog(false);
@@ -143,12 +288,11 @@ export default function EmailAudiencesTab() {
   const handleDelete = async () => {
     if (!deleteId) return;
     try {
-      const { error } = await supabase.from('email_audiences').delete().eq('id', deleteId);
-      if (error) throw error;
+      await audienceApi.delete(deleteId);
       toast.success('Público excluído!');
       if (selectedAudience?.id === deleteId) setSelectedAudience(null);
+      setAudiences(prev => prev.filter(a => a.id !== deleteId));
       setDeleteId(null);
-      await loadAudiences();
     } catch (err: any) {
       toast.error(err?.message || 'Erro ao excluir público');
     }
@@ -160,16 +304,9 @@ export default function EmailAudiencesTab() {
     if (query.length < 2) { setSearchResults([]); return; }
     setSearchLoading(true);
     try {
-      
-      const { data } = await supabase
-        .from('contacts')
-        .select('id, nome, email, telefone')
-        .eq('account_id', accountId)
-        .or(`nome.ilike.%${query}%,email.ilike.%${query}%,telefone.ilike.%${query}%`)
-        .limit(20);
-      // Exclude already-added contacts
-      const existingIds = new Set(audienceContacts.map(c => c.id));
-      setSearchResults((data || []).filter(c => !existingIds.has(c.id)));
+      const excludeIds = audienceContacts.map(c => c.id);
+      const results = await audienceApi.searchContacts(accountId, query, excludeIds);
+      setSearchResults(results);
     } catch {
       setSearchResults([]);
     } finally {
@@ -180,12 +317,7 @@ export default function EmailAudiencesTab() {
   const handleAddContacts = async () => {
     if (!selectedAudience || selectedContactIds.size === 0) return;
     try {
-      const inserts = Array.from(selectedContactIds).map(contactId => ({
-        audience_id: selectedAudience.id,
-        contact_id: contactId,
-      }));
-      const { error } = await supabase.from('email_audience_contacts').insert(inserts);
-      if (error) throw error;
+      await audienceApi.addContacts(selectedAudience.id, Array.from(selectedContactIds));
       toast.success(`${selectedContactIds.size} contato(s) adicionado(s)!`);
       setShowAddContactsDialog(false);
       setSelectedContactIds(new Set());
@@ -201,12 +333,7 @@ export default function EmailAudiencesTab() {
   const handleRemoveContact = async (contactId: string) => {
     if (!selectedAudience) return;
     try {
-      const { error } = await supabase
-        .from('email_audience_contacts')
-        .delete()
-        .eq('audience_id', selectedAudience.id)
-        .eq('contact_id', contactId);
-      if (error) throw error;
+      await audienceApi.removeContact(selectedAudience.id, contactId);
       toast.success('Contato removido do público!');
       loadAudienceContacts(selectedAudience.id);
       loadAudiences();
@@ -242,36 +369,7 @@ export default function EmailAudiencesTab() {
     if (!selectedAudience || csvData.length === 0) return;
     setImportLoading(true);
     try {
-      
-      // Create or find contacts by email
-      let added = 0;
-      for (const row of csvData) {
-        let { data: existing } = await supabase
-          .from('contacts')
-          .select('id')
-          .eq('account_id', accountId)
-          .ilike('email', row.email)
-          .maybeSingle();
-
-        let contactId: string;
-        if (existing) {
-          contactId = existing.id;
-        } else {
-          const { data: created, error } = await supabase
-            .from('contacts')
-            .insert({ account_id: accountId, nome: row.nome || null, email: row.email })
-            .select('id')
-            .single();
-          if (error) continue;
-          contactId = created.id;
-        }
-
-        const { error: linkErr } = await supabase
-          .from('email_audience_contacts')
-          .upsert({ audience_id: selectedAudience.id, contact_id: contactId }, { onConflict: 'audience_id,contact_id' });
-        if (!linkErr) added++;
-      }
-
+      const added = await audienceApi.importCsv(selectedAudience.id, accountId, csvData);
       toast.success(`${added} contatos importados ao público!`);
       setShowImportDialog(false);
       setCsvData([]);
