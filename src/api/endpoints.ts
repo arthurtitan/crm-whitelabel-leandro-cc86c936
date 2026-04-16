@@ -203,6 +203,12 @@ export const API_ENDPOINTS = {
     CAMPAIGN: (id: string) => `/api/email/campaigns/${id}`,
     CAMPAIGN_CADENCES: (id: string) => `/api/email/campaigns/${id}/cadences`,
     CAMPAIGN_STATS: (id: string) => `/api/email/campaigns/${id}/stats`,
+    // Audiences
+    AUDIENCES: '/api/email/audiences',
+    AUDIENCE: (id: string) => `/api/email/audiences/${id}`,
+    AUDIENCE_CONTACTS: (id: string) => `/api/email/audiences/${id}/contacts`,
+    AUDIENCE_REMOVE_CONTACT: (id: string, contactId: string) => `/api/email/audiences/${id}/contacts/${contactId}`,
+    AUDIENCE_IMPORT: (id: string) => `/api/email/audiences/${id}/import`,
     // Inbox
     INBOX: '/api/email/inbox',
     INBOX_UNREAD: '/api/email/inbox/unread',
