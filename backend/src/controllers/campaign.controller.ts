@@ -44,29 +44,29 @@ export const campaignController = {
 
   async delete(req: Request, res: Response, next: NextFunction) {
     try {
-      await campaignService.delete(req.params.id as string);
+      await campaignService.delete(req.params.id as string, getAccountId(req));
       res.json({ success: true });
     } catch (error) { next(error); }
   },
 
   async addCadence(req: Request, res: Response, next: NextFunction) {
     try {
-      const data = await campaignService.addCadence(req.params.id as string, req.body.cadenceId);
+      const data = await campaignService.addCadence(req.params.id as string, req.body.cadenceId, getAccountId(req));
       res.json(data);
     } catch (error) { next(error); }
   },
 
   async removeCadence(req: Request, res: Response, next: NextFunction) {
     try {
-      const cadenceId = req.body.cadenceId || req.query.cadenceId as string;
-      const data = await campaignService.removeCadence(cadenceId);
+      const cadenceId = (req.body.cadenceId || req.query.cadenceId) as string;
+      const data = await campaignService.removeCadence(req.params.id as string, cadenceId, getAccountId(req));
       res.json(data);
     } catch (error) { next(error); }
   },
 
   async getStats(req: Request, res: Response, next: NextFunction) {
     try {
-      const data = await campaignService.getStats(req.params.id as string);
+      const data = await campaignService.getStats(req.params.id as string, getAccountId(req));
       res.json(data);
     } catch (error) { next(error); }
   },

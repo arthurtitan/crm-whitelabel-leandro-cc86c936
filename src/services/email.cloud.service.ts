@@ -379,22 +379,28 @@ export const emailCloudService = {
     return data || [];
   },
 
-  async createCampaign(input: { name: string; description?: string }): Promise<any> {
+  async createCampaign(input: { name: string; description?: string; audienceId?: string | null }): Promise<any> {
     const { data: profile } = await supabase.from('profiles').select('account_id').single();
     if (!profile?.account_id) throw new Error('Conta não encontrada');
     const { data, error } = await supabase
       .from('email_campaigns' as any)
-      .insert({ account_id: profile.account_id, name: input.name, description: input.description })
+      .insert({ account_id: profile.account_id, name: input.name, description: input.description, audience_id: input.audienceId ?? null })
       .select()
       .single();
     if (error) throw new Error(error.message);
     return data;
   },
 
-  async updateCampaign(id: string, input: Partial<{ name: string; description: string; active: boolean }>): Promise<any> {
+  async updateCampaign(id: string, input: Partial<{ name: string; description: string; active: boolean; audienceId: string | null }>): Promise<any> {
+    const updateData: any = { ...input };
+    if ('audienceId' in updateData) {
+      updateData.audience_id = updateData.audienceId;
+      delete updateData.audienceId;
+    }
+
     const { data, error } = await supabase
       .from('email_campaigns' as any)
-      .update(input)
+      .update(updateData)
       .eq('id', id)
       .select()
       .single();
