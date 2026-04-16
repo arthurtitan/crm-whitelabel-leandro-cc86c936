@@ -42,6 +42,7 @@ import EmailTemplatesTab from '@/components/email/EmailTemplatesTab';
 import EmailEnrollmentsTab from '@/components/email/EmailEnrollmentsTab';
 import EmailSendsTab from '@/components/email/EmailSendsTab';
 import EmailInboxTab from '@/components/email/EmailInboxTab';
+import EmailCampaignsTab from '@/components/email/EmailCampaignsTab';
 
 export default function AdminEmailsPage() {
   // State
