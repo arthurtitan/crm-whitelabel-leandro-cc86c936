@@ -850,12 +850,14 @@ model EmailCampaign {
   name        String  @db.VarChar(255)
   description String?
   active      Boolean @default(true)
+  audienceId  String? @map("audience_id") @db.Uuid
   createdBy   String? @map("created_by") @db.Uuid
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   account  Account        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  audience EmailAudience? @relation(fields: [audienceId], references: [id], onDelete: SetNull)
   cadences EmailCadence[]
 
   @@index([accountId])
