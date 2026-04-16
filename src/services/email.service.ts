@@ -116,6 +116,7 @@ export interface EmailCampaign {
   account_id: string;
   name: string;
   description?: string | null;
+  audience_id?: string | null;
   active: boolean;
   created_by?: string | null;
   created_at: string;
@@ -158,11 +159,27 @@ function mapCadence(c: any): EmailCadence {
     target_stage_ids: c.target_stage_ids ?? c.targetStageIds ?? [],
     send_at_time: c.send_at_time ?? c.sendAtTime ?? '09:00',
     start_date: c.start_date ?? c.startDate ?? null,
+    campaign_id: c.campaign_id ?? c.campaignId ?? null,
     created_by: c.created_by ?? c.createdBy,
     created_at: c.created_at ?? c.createdAt,
     updated_at: c.updated_at ?? c.updatedAt,
     steps: (c.steps || []).map(mapStep),
     rules: (c.rulesFrom || c.rules || []).map(mapRule),
+  };
+}
+
+function mapCampaign(c: any): EmailCampaign {
+  return {
+    id: c.id,
+    account_id: c.account_id ?? c.accountId,
+    name: c.name,
+    description: c.description,
+    audience_id: c.audience_id ?? c.audienceId ?? null,
+    active: c.active ?? true,
+    created_by: c.created_by ?? c.createdBy,
+    created_at: c.created_at ?? c.createdAt,
+    updated_at: c.updated_at ?? c.updatedAt,
+    cadences: (c.cadences || []).map(mapCadence),
   };
 }
 
@@ -384,17 +401,17 @@ export const emailApiService = {
   // Campaigns
   async listCampaigns(): Promise<EmailCampaign[]> {
     const res = await apiClient.get<any>(API_ENDPOINTS.EMAIL.CAMPAIGNS);
-    return unwrap<any[]>(res) || [];
+    return (unwrap<any[]>(res) || []).map(mapCampaign);
   },
 
-  async createCampaign(data: { name: string; description?: string }): Promise<EmailCampaign> {
+  async createCampaign(data: { name: string; description?: string; audienceId?: string | null }): Promise<EmailCampaign> {
     const res = await apiClient.post<any>(API_ENDPOINTS.EMAIL.CAMPAIGNS, data);
-    return unwrap(res);
+    return mapCampaign(unwrap(res));
   },
 
-  async updateCampaign(id: string, data: Partial<{ name: string; description: string; active: boolean }>): Promise<EmailCampaign> {
+  async updateCampaign(id: string, data: Partial<{ name: string; description: string; active: boolean; audienceId: string | null }>): Promise<EmailCampaign> {
     const res = await apiClient.put<any>(API_ENDPOINTS.EMAIL.CAMPAIGN(id), data);
-    return unwrap(res);
+    return mapCampaign(unwrap(res));
   },
 
   async deleteCampaign(id: string): Promise<void> {
