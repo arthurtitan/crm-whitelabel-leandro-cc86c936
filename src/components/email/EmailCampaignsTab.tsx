@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useContext } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,6 +32,7 @@ import {
   type SendStats,
 } from '@/services/email.service';
 import { supabase } from '@/integrations/supabase/client';
+import { AuthContext } from '@/contexts/AuthContext';
 import EmailPreviewDialog from '@/components/email/EmailPreviewDialog';
 import EmailRichEditor from '@/components/email/EmailRichEditor';
 import EmailAIChat from '@/components/email/EmailAIChat';
@@ -52,15 +53,9 @@ interface CampaignFull extends EmailCampaign {
   linkedCadences?: EmailCadence[];
 }
 
-async function getAccountId(): Promise<string> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Não autenticado');
-  const { data: profile } = await supabase.from('profiles').select('account_id').eq('user_id', user.id).single();
-  if (!profile?.account_id) throw new Error('Conta não encontrada');
-  return profile.account_id;
-}
-
 export default function EmailCampaignsTab() {
+  const auth = useContext(AuthContext);
+  const accountId = auth?.account?.id || auth?.user?.account_id || '';
   const [campaigns, setCampaigns] = useState<CampaignFull[]>([]);
   const [audiences, setAudiences] = useState<Audience[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,7 +91,7 @@ export default function EmailCampaignsTab() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const accountId = await getAccountId();
+      
       const [campaignsData, cadencesData, templatesData] = await Promise.all([
         emailService.listCampaigns(),
         emailService.listCadences(),

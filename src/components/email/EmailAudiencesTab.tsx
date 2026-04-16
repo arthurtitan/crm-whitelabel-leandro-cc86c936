@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useContext } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,7 @@ import {
   Plus, Edit2, Trash2, Loader2, Users, Upload, UserPlus, Search, X
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { AuthContext } from '@/contexts/AuthContext';
 
 interface Audience {
   id: string;
@@ -31,15 +32,9 @@ interface Contact {
   telefone: string | null;
 }
 
-async function getAccountId(): Promise<string> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Não autenticado');
-  const { data: profile } = await supabase.from('profiles').select('account_id').eq('user_id', user.id).single();
-  if (!profile?.account_id) throw new Error('Conta não encontrada');
-  return profile.account_id;
-}
-
 export default function EmailAudiencesTab() {
+  const auth = useContext(AuthContext);
+  const accountId = auth?.account?.id || auth?.user?.account_id || '';
   const [audiences, setAudiences] = useState<Audience[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedAudience, setSelectedAudience] = useState<Audience | null>(null);
@@ -69,7 +64,7 @@ export default function EmailAudiencesTab() {
   const loadAudiences = useCallback(async () => {
     setLoading(true);
     try {
-      const accountId = await getAccountId();
+      
       const { data, error } = await supabase
         .from('email_audiences')
         .select('*')
@@ -121,7 +116,7 @@ export default function EmailAudiencesTab() {
   // CRUD
   const handleSave = async () => {
     try {
-      const accountId = await getAccountId();
+      
       if (editingAudience) {
         const { error } = await supabase
           .from('email_audiences')
@@ -165,7 +160,7 @@ export default function EmailAudiencesTab() {
     if (query.length < 2) { setSearchResults([]); return; }
     setSearchLoading(true);
     try {
-      const accountId = await getAccountId();
+      
       const { data } = await supabase
         .from('contacts')
         .select('id, nome, email, telefone')
@@ -247,7 +242,7 @@ export default function EmailAudiencesTab() {
     if (!selectedAudience || csvData.length === 0) return;
     setImportLoading(true);
     try {
-      const accountId = await getAccountId();
+      
       // Create or find contacts by email
       let added = 0;
       for (const row of csvData) {
