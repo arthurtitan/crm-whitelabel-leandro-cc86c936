@@ -54,6 +54,8 @@ interface CampaignFull extends EmailCampaign {
 }
 
 export default function EmailCampaignsTab() {
+  const auth = useContext(AuthContext);
+  const accountId = auth?.account?.id || auth?.user?.account_id || '';
   const [campaigns, setCampaigns] = useState<CampaignFull[]>([]);
   const [audiences, setAudiences] = useState<Audience[]>([]);
   const [loading, setLoading] = useState(true);

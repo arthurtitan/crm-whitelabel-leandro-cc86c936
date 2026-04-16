@@ -33,6 +33,8 @@ interface Contact {
 }
 
 export default function EmailAudiencesTab() {
+  const auth = useContext(AuthContext);
+  const accountId = auth?.account?.id || auth?.user?.account_id || '';
   const [audiences, setAudiences] = useState<Audience[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedAudience, setSelectedAudience] = useState<Audience | null>(null);
