@@ -1,0 +1,541 @@
+import { useState, useEffect, useCallback } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { toast } from 'sonner';
+import {
+  Plus, Edit2, Trash2, Loader2, Users, Upload, UserPlus, Search, X
+} from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+
+interface Audience {
+  id: string;
+  account_id: string;
+  name: string;
+  description: string | null;
+  created_at: string;
+  contact_count?: number;
+}
+
+interface Contact {
+  id: string;
+  nome: string | null;
+  email: string | null;
+  telefone: string | null;
+}
+
+async function getAccountId(): Promise<string> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Não autenticado');
+  const { data: profile } = await supabase.from('profiles').select('account_id').eq('user_id', user.id).single();
+  if (!profile?.account_id) throw new Error('Conta não encontrada');
+  return profile.account_id;
+}
+
+export default function EmailAudiencesTab() {
+  const [audiences, setAudiences] = useState<Audience[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedAudience, setSelectedAudience] = useState<Audience | null>(null);
+  const [audienceContacts, setAudienceContacts] = useState<Contact[]>([]);
+  const [loadingContacts, setLoadingContacts] = useState(false);
+
+  // Dialogs
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [editingAudience, setEditingAudience] = useState<Audience | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [showAddContactsDialog, setShowAddContactsDialog] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
+
+  // Form
+  const [form, setForm] = useState({ name: '', description: '' });
+
+  // Contact search
+  const [contactSearch, setContactSearch] = useState('');
+  const [searchResults, setSearchResults] = useState<Contact[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [selectedContactIds, setSelectedContactIds] = useState<Set<string>>(new Set());
+
+  // CSV import
+  const [csvData, setCsvData] = useState<{ nome: string; email: string }[]>([]);
+  const [importLoading, setImportLoading] = useState(false);
+
+  const loadAudiences = useCallback(async () => {
+    setLoading(true);
+    try {
+      const accountId = await getAccountId();
+      const { data, error } = await supabase
+        .from('email_audiences')
+        .select('*')
+        .eq('account_id', accountId)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+
+      // Get contact counts
+      const enriched = await Promise.all((data || []).map(async (a) => {
+        const { count } = await supabase
+          .from('email_audience_contacts')
+          .select('*', { count: 'exact', head: true })
+          .eq('audience_id', a.id);
+        return { ...a, contact_count: count || 0 };
+      }));
+
+      setAudiences(enriched);
+      if (enriched.length > 0 && !selectedAudience) {
+        setSelectedAudience(enriched[0]);
+      }
+    } catch (err: any) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadAudienceContacts = useCallback(async (audienceId: string) => {
+    setLoadingContacts(true);
+    try {
+      const { data, error } = await supabase
+        .from('email_audience_contacts')
+        .select('contact_id, contacts:contact_id(id, nome, email, telefone)')
+        .eq('audience_id', audienceId);
+      if (error) throw error;
+      setAudienceContacts((data || []).map((r: any) => r.contacts).filter(Boolean));
+    } catch (err: any) {
+      console.error(err);
+    } finally {
+      setLoadingContacts(false);
+    }
+  }, []);
+
+  useEffect(() => { loadAudiences(); }, [loadAudiences]);
+  useEffect(() => {
+    if (selectedAudience) loadAudienceContacts(selectedAudience.id);
+  }, [selectedAudience, loadAudienceContacts]);
+
+  // CRUD
+  const handleSave = async () => {
+    try {
+      const accountId = await getAccountId();
+      if (editingAudience) {
+        const { error } = await supabase
+          .from('email_audiences')
+          .update({ name: form.name, description: form.description || null })
+          .eq('id', editingAudience.id);
+        if (error) throw error;
+        toast.success('Público atualizado!');
+      } else {
+        const { error } = await supabase
+          .from('email_audiences')
+          .insert({ account_id: accountId, name: form.name, description: form.description || null });
+        if (error) throw error;
+        toast.success('Público criado!');
+      }
+      setShowCreateDialog(false);
+      setEditingAudience(null);
+      setForm({ name: '', description: '' });
+      await loadAudiences();
+    } catch (err: any) {
+      toast.error(err?.message || 'Erro ao salvar público');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    try {
+      const { error } = await supabase.from('email_audiences').delete().eq('id', deleteId);
+      if (error) throw error;
+      toast.success('Público excluído!');
+      if (selectedAudience?.id === deleteId) setSelectedAudience(null);
+      setDeleteId(null);
+      await loadAudiences();
+    } catch (err: any) {
+      toast.error(err?.message || 'Erro ao excluir público');
+    }
+  };
+
+  // Search contacts
+  const handleSearchContacts = async (query: string) => {
+    setContactSearch(query);
+    if (query.length < 2) { setSearchResults([]); return; }
+    setSearchLoading(true);
+    try {
+      const accountId = await getAccountId();
+      const { data } = await supabase
+        .from('contacts')
+        .select('id, nome, email, telefone')
+        .eq('account_id', accountId)
+        .or(`nome.ilike.%${query}%,email.ilike.%${query}%,telefone.ilike.%${query}%`)
+        .limit(20);
+      // Exclude already-added contacts
+      const existingIds = new Set(audienceContacts.map(c => c.id));
+      setSearchResults((data || []).filter(c => !existingIds.has(c.id)));
+    } catch {
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  const handleAddContacts = async () => {
+    if (!selectedAudience || selectedContactIds.size === 0) return;
+    try {
+      const inserts = Array.from(selectedContactIds).map(contactId => ({
+        audience_id: selectedAudience.id,
+        contact_id: contactId,
+      }));
+      const { error } = await supabase.from('email_audience_contacts').insert(inserts);
+      if (error) throw error;
+      toast.success(`${selectedContactIds.size} contato(s) adicionado(s)!`);
+      setShowAddContactsDialog(false);
+      setSelectedContactIds(new Set());
+      setContactSearch('');
+      setSearchResults([]);
+      loadAudienceContacts(selectedAudience.id);
+      loadAudiences();
+    } catch (err: any) {
+      toast.error(err?.message || 'Erro ao adicionar contatos');
+    }
+  };
+
+  const handleRemoveContact = async (contactId: string) => {
+    if (!selectedAudience) return;
+    try {
+      const { error } = await supabase
+        .from('email_audience_contacts')
+        .delete()
+        .eq('audience_id', selectedAudience.id)
+        .eq('contact_id', contactId);
+      if (error) throw error;
+      toast.success('Contato removido do público!');
+      loadAudienceContacts(selectedAudience.id);
+      loadAudiences();
+    } catch (err: any) {
+      toast.error(err?.message || 'Erro');
+    }
+  };
+
+  // CSV Import
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const text = evt.target?.result as string;
+      const lines = text.split('\n').filter(l => l.trim());
+      if (lines.length < 2) { toast.error('CSV vazio ou inválido'); return; }
+      const header = lines[0].toLowerCase().split(/[,;]/);
+      const nomeIdx = header.findIndex(h => h.trim().includes('nome') || h.trim().includes('name'));
+      const emailIdx = header.findIndex(h => h.trim().includes('email') || h.trim().includes('mail'));
+      if (emailIdx === -1) { toast.error('Coluna "email" não encontrada no CSV'); return; }
+      const rows = lines.slice(1).map(line => {
+        const cols = line.split(/[,;]/);
+        return { nome: nomeIdx >= 0 ? cols[nomeIdx]?.trim() || '' : '', email: cols[emailIdx]?.trim() || '' };
+      }).filter(r => r.email);
+      setCsvData(rows);
+      toast.info(`${rows.length} contatos encontrados no arquivo`);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleImportCsv = async () => {
+    if (!selectedAudience || csvData.length === 0) return;
+    setImportLoading(true);
+    try {
+      const accountId = await getAccountId();
+      // Create or find contacts by email
+      let added = 0;
+      for (const row of csvData) {
+        let { data: existing } = await supabase
+          .from('contacts')
+          .select('id')
+          .eq('account_id', accountId)
+          .ilike('email', row.email)
+          .maybeSingle();
+
+        let contactId: string;
+        if (existing) {
+          contactId = existing.id;
+        } else {
+          const { data: created, error } = await supabase
+            .from('contacts')
+            .insert({ account_id: accountId, nome: row.nome || null, email: row.email })
+            .select('id')
+            .single();
+          if (error) continue;
+          contactId = created.id;
+        }
+
+        const { error: linkErr } = await supabase
+          .from('email_audience_contacts')
+          .upsert({ audience_id: selectedAudience.id, contact_id: contactId }, { onConflict: 'audience_id,contact_id' });
+        if (!linkErr) added++;
+      }
+
+      toast.success(`${added} contatos importados ao público!`);
+      setShowImportDialog(false);
+      setCsvData([]);
+      loadAudienceContacts(selectedAudience.id);
+      loadAudiences();
+    } catch (err: any) {
+      toast.error(err?.message || 'Erro na importação');
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>;
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <Users className="w-5 h-5 text-primary" />
+          <h3 className="text-lg font-semibold">Públicos</h3>
+          <span className="text-sm text-muted-foreground">{audiences.length} público(s)</span>
+        </div>
+        <Button size="sm" onClick={() => { setEditingAudience(null); setForm({ name: '', description: '' }); setShowCreateDialog(true); }}>
+          <Plus className="w-4 h-4 mr-1" /> Novo Público
+        </Button>
+      </div>
+
+      <div className="grid lg:grid-cols-[300px_1fr] gap-6">
+        {/* Audience list */}
+        <div className="space-y-2">
+          {audiences.length === 0 ? (
+            <Card className="card-gradient border-border/50">
+              <CardContent className="py-8 text-center text-muted-foreground">
+                <Users className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">Nenhum público criado</p>
+                <p className="text-xs mt-1">Crie um público para agrupar contatos.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            audiences.map(a => (
+              <button
+                key={a.id}
+                className={`w-full text-left p-3 rounded-lg border transition-all ${
+                  selectedAudience?.id === a.id
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border/50 hover:bg-muted/30'
+                }`}
+                onClick={() => setSelectedAudience(a)}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-sm truncate">{a.name}</span>
+                  <Badge variant="secondary" className="text-[10px] ml-2 flex-shrink-0">
+                    {a.contact_count || 0} contatos
+                  </Badge>
+                </div>
+                {a.description && <p className="text-xs text-muted-foreground mt-0.5 truncate">{a.description}</p>}
+              </button>
+            ))
+          )}
+        </div>
+
+        {/* Audience detail */}
+        {selectedAudience ? (
+          <div className="space-y-4">
+            <Card className="card-gradient border-border/50">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-base">{selectedAudience.name}</CardTitle>
+                    {selectedAudience.description && (
+                      <p className="text-sm text-muted-foreground mt-0.5">{selectedAudience.description}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button variant="outline" size="sm" onClick={() => setShowImportDialog(true)}>
+                      <Upload className="w-4 h-4 mr-1" /> Importar CSV
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => {
+                      setShowAddContactsDialog(true);
+                      setSelectedContactIds(new Set());
+                      setContactSearch('');
+                      setSearchResults([]);
+                    }}>
+                      <UserPlus className="w-4 h-4 mr-1" /> Adicionar
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => {
+                      setEditingAudience(selectedAudience);
+                      setForm({ name: selectedAudience.name, description: selectedAudience.description || '' });
+                      setShowCreateDialog(true);
+                    }}>
+                      <Edit2 className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setDeleteId(selectedAudience.id)}>
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {loadingContacts ? (
+                  <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+                ) : audienceContacts.length === 0 ? (
+                  <div className="text-center py-6 text-muted-foreground">
+                    <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">Nenhum contato neste público</p>
+                    <p className="text-xs">Importe um CSV ou adicione contatos manualmente.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1 max-h-[400px] overflow-y-auto">
+                    {audienceContacts.map(c => (
+                      <div key={c.id} className="flex items-center justify-between p-2 rounded hover:bg-muted/30 text-sm">
+                        <div className="flex-1 min-w-0">
+                          <span className="font-medium">{c.nome || 'Sem nome'}</span>
+                          {c.email && <span className="text-muted-foreground ml-2 text-xs">{c.email}</span>}
+                        </div>
+                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => handleRemoveContact(c.id)}>
+                          <X className="w-3 h-3 text-muted-foreground" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        ) : (
+          <Card className="card-gradient border-border/50">
+            <CardContent className="py-12 text-center text-muted-foreground">
+              <p className="text-sm">Selecione um público para ver seus contatos</p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Create/Edit Audience Dialog */}
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingAudience ? 'Editar Público' : 'Novo Público'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Nome</label>
+              <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="Ex: Leads Clínicas SP" />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Descrição</label>
+              <Textarea value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} placeholder="Descreva este público..." rows={2} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>Cancelar</Button>
+            <Button onClick={handleSave} disabled={!form.name.trim()}>{editingAudience ? 'Salvar' : 'Criar'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Contacts Dialog */}
+      <Dialog open={showAddContactsDialog} onOpenChange={setShowAddContactsDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Adicionar Contatos ao Público</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                value={contactSearch}
+                onChange={e => handleSearchContacts(e.target.value)}
+                placeholder="Buscar por nome, email ou telefone..."
+                className="pl-9"
+              />
+            </div>
+            <div className="max-h-[300px] overflow-y-auto space-y-1">
+              {searchLoading && <div className="flex justify-center py-4"><Loader2 className="w-4 h-4 animate-spin" /></div>}
+              {!searchLoading && searchResults.length === 0 && contactSearch.length >= 2 && (
+                <p className="text-center text-sm text-muted-foreground py-4">Nenhum contato encontrado</p>
+              )}
+              {searchResults.map(c => (
+                <label key={c.id} className="flex items-center gap-3 p-2 rounded hover:bg-muted/30 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedContactIds.has(c.id)}
+                    onChange={e => {
+                      const next = new Set(selectedContactIds);
+                      e.target.checked ? next.add(c.id) : next.delete(c.id);
+                      setSelectedContactIds(next);
+                    }}
+                    className="rounded"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-medium">{c.nome || 'Sem nome'}</span>
+                    {c.email && <span className="text-xs text-muted-foreground ml-2">{c.email}</span>}
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddContactsDialog(false)}>Cancelar</Button>
+            <Button onClick={handleAddContacts} disabled={selectedContactIds.size === 0}>
+              Adicionar {selectedContactIds.size > 0 ? `(${selectedContactIds.size})` : ''}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import CSV Dialog */}
+      <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Importar Contatos via CSV</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              O arquivo deve ter pelo menos a coluna <strong>email</strong>. A coluna <strong>nome</strong> é opcional.
+            </p>
+            <Input type="file" accept=".csv,.txt" onChange={handleFileUpload} />
+            {csvData.length > 0 && (
+              <div className="rounded border p-3 bg-muted/30">
+                <p className="text-sm font-medium mb-2">{csvData.length} contatos encontrados</p>
+                <div className="max-h-[150px] overflow-y-auto space-y-1 text-xs">
+                  {csvData.slice(0, 10).map((r, i) => (
+                    <div key={i} className="flex gap-3">
+                      <span className="text-muted-foreground w-24 truncate">{r.nome || '—'}</span>
+                      <span>{r.email}</span>
+                    </div>
+                  ))}
+                  {csvData.length > 10 && <p className="text-muted-foreground">+{csvData.length - 10} mais...</p>}
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowImportDialog(false); setCsvData([]); }}>Cancelar</Button>
+            <Button onClick={handleImportCsv} disabled={csvData.length === 0 || importLoading}>
+              {importLoading ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Upload className="w-4 h-4 mr-1" />}
+              Importar {csvData.length > 0 ? `(${csvData.length})` : ''}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteId} onOpenChange={open => !open && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir público?</AlertDialogTitle>
+            <AlertDialogDescription>Os contatos não serão excluídos, apenas removidos deste público.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">Excluir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
