@@ -32,6 +32,7 @@ import {
   type SendStats,
 } from '@/services/email.service';
 import { supabase } from '@/integrations/supabase/client';
+import { useBackend } from '@/config/backend.config';
 import { AuthContext } from '@/contexts/AuthContext';
 import EmailPreviewDialog from '@/components/email/EmailPreviewDialog';
 import EmailRichEditor from '@/components/email/EmailRichEditor';
