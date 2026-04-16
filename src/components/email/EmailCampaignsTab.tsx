@@ -183,8 +183,8 @@ export default function EmailCampaignsTab() {
       await emailService.deleteCampaign(deleteId);
       toast.success('Campanha excluída!');
       if (selectedCampaign?.id === deleteId) { setSelectedCampaign(null); setSelectedCadence(null); }
+      setCampaigns(prev => prev.filter(c => c.id !== deleteId));
       setDeleteId(null);
-      await loadData();
     } catch (err: any) {
       toast.error(err?.message || 'Erro ao excluir');
     }
