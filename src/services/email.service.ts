@@ -44,6 +44,7 @@ export interface EmailCadence {
   target_stage_ids?: string[];
   send_at_time?: string;
   start_date?: string;
+  campaign_id?: string | null;
   created_by?: string | null;
   created_at: string;
   updated_at: string;

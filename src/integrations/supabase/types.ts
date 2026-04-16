@@ -454,6 +454,7 @@ export type Database = {
         Row: {
           account_id: string
           active: boolean
+          campaign_id: string | null
           created_at: string
           created_by: string | null
           description: string | null
@@ -467,6 +468,7 @@ export type Database = {
         Insert: {
           account_id: string
           active?: boolean
+          campaign_id?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -480,6 +482,7 @@ export type Database = {
         Update: {
           account_id?: string
           active?: boolean
+          campaign_id?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -493,6 +496,54 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "email_cadences_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_cadences_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "email_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_campaigns: {
+        Row: {
+          account_id: string
+          active: boolean
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_campaigns_account_id_fkey"
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"

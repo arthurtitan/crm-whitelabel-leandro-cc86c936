@@ -423,8 +423,41 @@ export const emailCloudService = {
     if (error) throw new Error(error.message);
   },
 
-  async getCampaignStats(_campaignId: string): Promise<any> {
-    return { total: 0, sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, failed: 0, enrollments: 0 };
+  async getCampaignStats(campaignId: string): Promise<any> {
+    // Get cadences linked to this campaign using raw filter to avoid type depth issues
+    const { data: cadences } = await (supabase
+      .from('email_cadences')
+      .select('id') as any)
+      .eq('campaign_id', campaignId);
+    const cadenceIds: string[] = (cadences || []).map((c: any) => c.id);
+    if (cadenceIds.length === 0) {
+      return { total: 0, sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, failed: 0, enrollments: 0 };
+    }
+    // Get enrollments for these cadences
+    const { data: enrollmentRows } = await supabase
+      .from('email_enrollments')
+      .select('id')
+      .in('cadence_id', cadenceIds);
+    const enrollmentIds: string[] = (enrollmentRows || []).map((e: any) => e.id);
+    if (enrollmentIds.length === 0) {
+      return { total: 0, sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, failed: 0, enrollments: enrollmentRows?.length || 0 };
+    }
+    // Aggregate sends
+    const { data: sends } = await supabase
+      .from('email_sends')
+      .select('status')
+      .in('enrollment_id', enrollmentIds);
+    const s = sends || [];
+    return {
+      total: s.length,
+      sent: s.filter((x: any) => x.status === 'sent').length,
+      delivered: s.filter((x: any) => x.status === 'delivered').length,
+      opened: s.filter((x: any) => x.status === 'opened').length,
+      clicked: s.filter((x: any) => x.status === 'clicked').length,
+      bounced: s.filter((x: any) => x.status === 'bounced').length,
+      failed: s.filter((x: any) => x.status === 'failed').length,
+      enrollments: enrollmentRows?.length || 0,
+    };
   },
 
   // ==================== INBOX ====================

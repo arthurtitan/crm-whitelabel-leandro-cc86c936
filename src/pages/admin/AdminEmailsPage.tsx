@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import {
   Mail, Plus, Send, Eye, MousePointer, AlertTriangle, Clock, Sparkles,
   Edit2, Trash2, MoreHorizontal, Loader2, ChevronRight,
-  GitBranch, Zap, AlertCircle, FileText, Users, Inbox
+  GitBranch, Zap, AlertCircle, FileText, Users, Inbox, FolderOpen
 } from 'lucide-react';
 import EmailPreviewDialog from '@/components/email/EmailPreviewDialog';
 import EmailRichEditor from '@/components/email/EmailRichEditor';
@@ -42,6 +42,7 @@ import EmailTemplatesTab from '@/components/email/EmailTemplatesTab';
 import EmailEnrollmentsTab from '@/components/email/EmailEnrollmentsTab';
 import EmailSendsTab from '@/components/email/EmailSendsTab';
 import EmailInboxTab from '@/components/email/EmailInboxTab';
+import EmailCampaignsTab from '@/components/email/EmailCampaignsTab';
 
 export default function AdminEmailsPage() {
   // State
@@ -323,8 +324,12 @@ export default function AdminEmailsPage() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="cadences" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+      <Tabs defaultValue="campaigns" className="w-full">
+        <TabsList className="grid w-full grid-cols-6">
+          <TabsTrigger value="campaigns" className="flex items-center gap-2">
+            <FolderOpen className="w-4 h-4" />
+            Campanhas
+          </TabsTrigger>
           <TabsTrigger value="cadences" className="flex items-center gap-2">
             <Clock className="w-4 h-4" />
             Cadências
@@ -351,6 +356,11 @@ export default function AdminEmailsPage() {
             )}
           </TabsTrigger>
         </TabsList>
+
+        {/* TAB: CAMPAIGNS */}
+        <TabsContent value="campaigns" className="mt-6">
+          <EmailCampaignsTab />
+        </TabsContent>
 
         {/* TAB: CADENCES */}
         <TabsContent value="cadences" className="mt-6">
