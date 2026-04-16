@@ -34,7 +34,6 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { AuthContext } from '@/contexts/AuthContext';
 import { useBackend } from '@/config/backend.config';
-import { useBackend } from '@/config/backend.config';
 import EmailPreviewDialog from '@/components/email/EmailPreviewDialog';
 import EmailRichEditor from '@/components/email/EmailRichEditor';
 import EmailAIChat from '@/components/email/EmailAIChat';
