@@ -18,7 +18,7 @@ export const emailCloudService = {
   async listCadences(): Promise<EmailCadence[]> {
     const { data, error } = await supabase
       .from('email_cadences')
-      .select('*, steps:email_cadence_steps(*), rules:email_cadence_rules(*)')
+      .select('*, steps:email_cadence_steps(*), rules:email_cadence_rules!email_cadence_rules_cadence_id_fkey(*)')
       .order('created_at', { ascending: false });
     if (error) throw new Error(error.message);
     return (data || []).map(c => ({
@@ -31,7 +31,7 @@ export const emailCloudService = {
   async getCadence(id: string): Promise<EmailCadence> {
     const { data, error } = await supabase
       .from('email_cadences')
-      .select('*, steps:email_cadence_steps(*), rules:email_cadence_rules(*)')
+      .select('*, steps:email_cadence_steps(*), rules:email_cadence_rules!email_cadence_rules_cadence_id_fkey(*)')
       .eq('id', id)
       .single();
     if (error) throw new Error(error.message);
