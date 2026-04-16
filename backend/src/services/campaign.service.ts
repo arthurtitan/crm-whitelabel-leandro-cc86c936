@@ -125,8 +125,17 @@ export const campaignService = {
   async removeCadence(campaignId: string, cadenceId: string, accountId: string) {
     await ensureCampaignBelongsToAccount(campaignId, accountId);
 
-    return prisma.emailCadence.update({
+    const cadence = await prisma.emailCadence.findFirst({
       where: { id: cadenceId, accountId, campaignId },
+      select: { id: true },
+    });
+
+    if (!cadence) {
+      throw new Error('Cadência não encontrada');
+    }
+
+    return prisma.emailCadence.update({
+      where: { id: cadenceId },
       data: { campaignId: null },
     });
   },
