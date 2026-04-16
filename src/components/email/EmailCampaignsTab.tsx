@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useContext } from 'react';
+import { useState, useEffect, useCallback, useContext, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,7 +31,6 @@ import {
   type EmailTemplate,
   type SendStats,
 } from '@/services/email.service';
-import { supabase } from '@/integrations/supabase/client';
 import { useBackend } from '@/config/backend.config';
 import { AuthContext } from '@/contexts/AuthContext';
 import EmailPreviewDialog from '@/components/email/EmailPreviewDialog';
@@ -40,6 +39,8 @@ import EmailAIChat from '@/components/email/EmailAIChat';
 import EmailTemplatesTab from '@/components/email/EmailTemplatesTab';
 import EmailSendsTab from '@/components/email/EmailSendsTab';
 import EmailInboxTab from '@/components/email/EmailInboxTab';
+import { apiClient } from '@/api/client';
+import { API_ENDPOINTS } from '@/api/endpoints';
 
 interface Audience {
   id: string;
@@ -88,20 +89,38 @@ export default function EmailCampaignsTab() {
 
   // Templates
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+  const selectedCampaignIdRef = useRef<string | null>(null);
+  const selectedCadenceIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    selectedCampaignIdRef.current = selectedCampaign?.id || null;
+  }, [selectedCampaign]);
+
+  useEffect(() => {
+    selectedCadenceIdRef.current = selectedCadence?.id || null;
+  }, [selectedCadence]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      
       const [campaignsData, cadencesData, templatesData] = await Promise.all([
         emailService.listCampaigns(),
         emailService.listCadences(),
         emailService.listTemplates().catch(() => []),
       ]);
 
-      // Load audiences (only available in Cloud mode)
+      // Load audiences in both modes
       let audWithCounts: Audience[] = [];
-      if (!useBackend) {
+      if (useBackend) {
+        const res = await apiClient.get<any>(API_ENDPOINTS.EMAIL.AUDIENCES);
+        const data = res?.data ?? res;
+        audWithCounts = (Array.isArray(data) ? data : []).map((a: any) => ({
+          id: a.id,
+          name: a.name,
+          contact_count: a.contact_count ?? a._count?.contacts ?? 0,
+        }));
+      } else {
+        const { supabase } = await import('@/integrations/supabase/client');
         const { data: audData } = await supabase
           .from('email_audiences')
           .select('id, name')
@@ -120,52 +139,54 @@ export default function EmailCampaignsTab() {
       // Enrich campaigns
       const enriched: CampaignFull[] = await Promise.all(campaignsData.map(async (camp: any) => {
         const linked = cadencesData.filter((c: any) => c.campaign_id === camp.id);
-        const audience = camp.audience_id ? audWithCounts.find(a => a.id === camp.audience_id) || null : null;
+        const audienceId = camp.audience_id ?? camp.audience?.id ?? null;
+        const audience = audienceId ? audWithCounts.find(a => a.id === audienceId) || null : null;
         let stats = { total: 0, sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, failed: 0, enrollments: 0 };
         try { stats = await emailService.getCampaignStats(camp.id); } catch {}
-        return { ...camp, linkedCadences: linked, audience, stats };
+        return { ...camp, audience_id: audienceId, linkedCadences: linked, audience, stats };
       }));
 
       setCampaigns(enriched);
       setTemplates(templatesData);
 
-      if (enriched.length > 0 && !selectedCampaign) {
-        setSelectedCampaign(enriched[0]);
-        if (enriched[0].linkedCadences?.length) setSelectedCadence(enriched[0].linkedCadences[0]);
-      } else if (selectedCampaign) {
-        const updated = enriched.find(c => c.id === selectedCampaign.id);
-        if (updated) {
-          setSelectedCampaign(updated);
-          if (selectedCadence) {
-            const updCad = updated.linkedCadences?.find(c => c.id === selectedCadence.id);
-            if (updCad) setSelectedCadence(updCad);
-          }
-        }
+      const currentCampaignId = selectedCampaignIdRef.current;
+      const currentCadenceId = selectedCadenceIdRef.current;
+      const nextCampaign = (currentCampaignId && enriched.find(c => c.id === currentCampaignId)) || enriched[0] || null;
+
+      setSelectedCampaign(nextCampaign);
+
+      if (nextCampaign) {
+        const nextCadence = (currentCadenceId && nextCampaign.linkedCadences?.find(c => c.id === currentCadenceId))
+          || nextCampaign.linkedCadences?.[0]
+          || null;
+        setSelectedCadence(nextCadence);
+      } else {
+        setSelectedCadence(null);
       }
     } catch (err: any) {
       console.error('Erro ao carregar campanhas:', err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [accountId]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
   // ==================== CAMPAIGN CRUD ====================
   const handleSaveCampaign = async () => {
     try {
+      const payload = {
+        name: form.name,
+        description: form.description,
+        audienceId: form.audienceId || null,
+      };
+
       if (editingCampaign) {
-        await emailService.updateCampaign(editingCampaign.id, { name: form.name, description: form.description });
-        // Update audience separately (Cloud only)
-        if (form.audienceId && !useBackend) {
-          await supabase.from('email_campaigns').update({ audience_id: form.audienceId } as any).eq('id', editingCampaign.id);
-        }
+        await emailService.updateCampaign(editingCampaign.id, payload);
         toast.success('Campanha atualizada!');
       } else {
-        const created = await emailService.createCampaign({ name: form.name, description: form.description });
-        if (form.audienceId && !useBackend) {
-          await supabase.from('email_campaigns').update({ audience_id: form.audienceId } as any).eq('id', created.id);
-        }
+        const created = await emailService.createCampaign(payload);
+        selectedCampaignIdRef.current = created.id;
         toast.success('Campanha criada!');
       }
       setShowCreateDialog(false);
@@ -202,7 +223,9 @@ export default function EmailCampaignsTab() {
         const created = await emailService.createCadence(cadenceForm);
         // Link to campaign
         await emailService.addCadenceToCampaign(selectedCampaign.id, created.id);
-        setSelectedCadence(created);
+        selectedCampaignIdRef.current = selectedCampaign.id;
+        selectedCadenceIdRef.current = created.id;
+        setSelectedCadence({ ...created, campaign_id: selectedCampaign.id });
         toast.success('Cadência criada e vinculada!');
       }
       setShowCadenceDialog(false);
