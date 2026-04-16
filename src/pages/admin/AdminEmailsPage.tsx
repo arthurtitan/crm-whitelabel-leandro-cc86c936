@@ -324,8 +324,12 @@ export default function AdminEmailsPage() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="cadences" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+      <Tabs defaultValue="campaigns" className="w-full">
+        <TabsList className="grid w-full grid-cols-6">
+          <TabsTrigger value="campaigns" className="flex items-center gap-2">
+            <FolderOpen className="w-4 h-4" />
+            Campanhas
+          </TabsTrigger>
           <TabsTrigger value="cadences" className="flex items-center gap-2">
             <Clock className="w-4 h-4" />
             Cadências
@@ -352,6 +356,11 @@ export default function AdminEmailsPage() {
             )}
           </TabsTrigger>
         </TabsList>
+
+        {/* TAB: CAMPAIGNS */}
+        <TabsContent value="campaigns" className="mt-6">
+          <EmailCampaignsTab />
+        </TabsContent>
 
         {/* TAB: CADENCES */}
         <TabsContent value="cadences" className="mt-6">
