@@ -302,12 +302,14 @@ export function SavedAudiencesTab({ accountId, onDispatchStarted }: Props) {
         open={csvOpen}
         onOpenChange={setCsvOpen}
         onConfirm={openDispatchWith}
+        onSaved={load}
       />
 
       <CrmContactsPickerDialog
         open={crmOpen}
         onOpenChange={setCrmOpen}
         onConfirm={openDispatchWith}
+        onSaved={load}
       />
     </>
   );
