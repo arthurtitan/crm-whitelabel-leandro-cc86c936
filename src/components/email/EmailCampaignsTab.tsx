@@ -79,9 +79,14 @@ export default function EmailCampaignsTab() {
   // Step state
   const [showStepDialog, setShowStepDialog] = useState(false);
   const [editingStep, setEditingStep] = useState<EmailCadenceStep | null>(null);
-  const [stepForm, setStepForm] = useState({ dayNumber: 1, subject: '', bodyHtml: '', bodyText: '' });
+  const [stepForm, setStepForm] = useState<{ dayNumber: number; subject: string; bodyHtml: string; bodyText: string; templateId: string | null }>({ dayNumber: 1, subject: '', bodyHtml: '', bodyText: '', templateId: null });
   const [showStepAI, setShowStepAI] = useState(false);
   const [previewStep, setPreviewStep] = useState<EmailCadenceStep | null>(null);
+
+  // Quick template editor (opened from a step)
+  const [editingTemplate, setEditingTemplate] = useState<EmailTemplate | null>(null);
+  const [templateForm, setTemplateForm] = useState({ name: '', subject: '', bodyHtml: '', bodyText: '' });
+  const [savingTemplate, setSavingTemplate] = useState(false);
 
   // Rule state
   const [showRuleDialog, setShowRuleDialog] = useState(false);
@@ -260,7 +265,7 @@ export default function EmailCampaignsTab() {
         toast.success('Step criado!');
       }
       setShowStepDialog(false);
-      setStepForm({ dayNumber: 1, subject: '', bodyHtml: '', bodyText: '' });
+      setStepForm({ dayNumber: 1, subject: '', bodyHtml: '', bodyText: '', templateId: null });
       setEditingStep(null);
       setShowStepAI(false);
       await loadData();
@@ -306,8 +311,34 @@ export default function EmailCampaignsTab() {
   const handleLoadTemplate = (templateId: string) => {
     const t = templates.find(t => t.id === templateId);
     if (t) {
-      setStepForm(prev => ({ ...prev, subject: t.subject, bodyHtml: t.body_html, bodyText: t.body_text || '' }));
-      toast.info(`Template "${t.name}" carregado!`);
+      setStepForm(prev => ({ ...prev, subject: t.subject, bodyHtml: t.body_html, bodyText: t.body_text || '', templateId: t.id }));
+      toast.info(`Template "${t.name}" vinculado! Editar o template atualizará todos os steps vinculados.`);
+    }
+  };
+
+  const openTemplateQuickEdit = (templateId: string) => {
+    const t = templates.find(t => t.id === templateId);
+    if (!t) return toast.error('Template não encontrado');
+    setEditingTemplate(t);
+    setTemplateForm({ name: t.name, subject: t.subject, bodyHtml: t.body_html, bodyText: t.body_text || '' });
+  };
+
+  const handleSaveTemplateQuick = async () => {
+    if (!editingTemplate) return;
+    setSavingTemplate(true);
+    try {
+      const updated = await emailService.updateTemplate(editingTemplate.id, templateForm);
+      setTemplates(prev => prev.map(t => t.id === updated.id ? updated : t));
+      // If currently editing a step linked to this template, sync the form fields too
+      if (stepForm.templateId === updated.id) {
+        setStepForm(prev => ({ ...prev, subject: updated.subject, bodyHtml: updated.body_html, bodyText: updated.body_text || '' }));
+      }
+      toast.success('Template atualizado! Próximos envios usarão a versão nova.');
+      setEditingTemplate(null);
+    } catch (err: any) {
+      toast.error(err?.message || 'Erro ao salvar template');
+    } finally {
+      setSavingTemplate(false);
     }
   };
 
