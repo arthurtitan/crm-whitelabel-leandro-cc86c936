@@ -37,7 +37,6 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminKanbanPage from "./pages/admin/AdminKanbanPage";
 import AdminLeadsPage from "./pages/admin/AdminLeadsPage";
 import AdminSalesPage from "./pages/admin/AdminSalesPage";
-import AdminEventsPage from "./pages/admin/AdminEventsPage";
 
 import AdminFinancePage from "./pages/admin/AdminFinancePage";
 import AdminProductsPage from "./pages/admin/AdminProductsPage";

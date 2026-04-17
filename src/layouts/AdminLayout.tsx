@@ -47,7 +47,6 @@ const adminNavItems = [
   { title: 'Vendas', href: '/admin/sales', icon: DollarSign },
   { title: 'Financeiro', href: '/admin/finance', icon: Wallet },
   { title: 'Produtos', href: '/admin/products', icon: Package },
-  { title: 'Eventos', href: '/admin/events', icon: Activity },
   { title: 'Insights', href: '/admin/insights', icon: Lightbulb },
   { title: 'Prospecção', href: '/admin/prospeccao', icon: Crosshair },
   { title: 'E-mails', href: '/admin/emails', icon: Mail },
