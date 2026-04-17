@@ -172,9 +172,10 @@ class SaleService {
       }
     }
 
-    // Check for recurring sale
+    // Check for recurring sale (scoped to account)
     const existingSale = await prisma.sale.findFirst({
       where: {
+        accountId: input.accountId,
         contactId: input.contactId,
         items: {
           some: {
