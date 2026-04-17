@@ -43,6 +43,15 @@ export function SavedAudiencesTab({ accountId, onDispatchStarted }: Props) {
   const [loadingLeads, setLoadingLeads] = useState<string | null>(null);
   const [dispatchOpen, setDispatchOpen] = useState(false);
   const [dispatchLeads, setDispatchLeads] = useState<ExtractedLead[]>([]);
+  const [csvOpen, setCsvOpen] = useState(false);
+  const [crmOpen, setCrmOpen] = useState(false);
+
+  const openDispatchWith = (leads: ExtractedLead[]) => {
+    setDispatchLeads(leads);
+    setCsvOpen(false);
+    setCrmOpen(false);
+    setDispatchOpen(true);
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
