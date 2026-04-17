@@ -10,13 +10,15 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Send, Trash2, Users, Loader2, Inbox } from 'lucide-react';
+import { Send, Trash2, Users, Loader2, Inbox, Upload, UserPlus } from 'lucide-react';
 import { useBackend } from '@/config/backend.config';
 import { apiClient } from '@/api/client';
 import { API_ENDPOINTS } from '@/api/endpoints';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { DispatchDialog } from './DispatchDialog';
+import { CsvImportDialog } from './CsvImportDialog';
+import { CrmContactsPickerDialog } from './CrmContactsPickerDialog';
 import type { ExtractedLead } from './types';
 
 interface Audience {
