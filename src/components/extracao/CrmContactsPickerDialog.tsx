@@ -9,13 +9,14 @@ import { Badge } from '@/components/ui/badge';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Search, Loader2, Send, Users, Filter } from 'lucide-react';
+import { Search, Loader2, Send, Users, Filter, Save } from 'lucide-react';
 import { useBackend } from '@/config/backend.config';
 import { apiClient } from '@/api/client';
 import { API_ENDPOINTS } from '@/api/endpoints';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { normalizePhoneBR } from './csvParser';
+import { SaveAudienceDialog } from './SaveAudienceDialog';
 import type { ExtractedLead } from './types';
 
 interface CrmContact {
@@ -34,11 +35,12 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: (leads: ExtractedLead[]) => void;
+  onSaved?: () => void;
 }
 
 const ALL_STAGES = '__all__';
 
-export function CrmContactsPickerDialog({ open, onOpenChange, onConfirm }: Props) {
+export function CrmContactsPickerDialog({ open, onOpenChange, onConfirm, onSaved }: Props) {
   const { toast } = useToast();
   const [contacts, setContacts] = useState<CrmContact[]>([]);
   const [loading, setLoading] = useState(false);
@@ -46,6 +48,7 @@ export function CrmContactsPickerDialog({ open, onOpenChange, onConfirm }: Props
   const [stageId, setStageId] = useState<string>(ALL_STAGES);
   const [stages, setStages] = useState<StageTag[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [saveOpen, setSaveOpen] = useState(false);
 
   const loadStages = useCallback(async () => {
     try {
@@ -147,9 +150,9 @@ export function CrmContactsPickerDialog({ open, onOpenChange, onConfirm }: Props
     else setSelectedIds(new Set(contacts.map((c) => c.id)));
   };
 
-  const handleConfirm = () => {
+  const buildLeads = (): ExtractedLead[] => {
     const selected = contacts.filter((c) => selectedIds.has(c.id));
-    const leads: ExtractedLead[] = selected
+    return selected
       .map((c, idx) => {
         const phone = normalizePhoneBR(c.telefone || '');
         if (!phone) return null;
@@ -162,13 +165,26 @@ export function CrmContactsPickerDialog({ open, onOpenChange, onConfirm }: Props
         };
       })
       .filter((l): l is ExtractedLead => l !== null);
+  };
 
+  const handleConfirm = () => {
+    const leads = buildLeads();
     if (leads.length === 0) {
       toast({ title: 'Nenhum contato com telefone válido', variant: 'destructive' });
       return;
     }
     onConfirm(leads);
   };
+
+  const handleOpenSave = () => {
+    if (selectedIds.size === 0) {
+      toast({ title: 'Selecione ao menos 1 contato', variant: 'destructive' });
+      return;
+    }
+    setSaveOpen(true);
+  };
+
+  const stageName = stages.find((s) => s.id === stageId)?.name;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
