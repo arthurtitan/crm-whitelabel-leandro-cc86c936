@@ -155,7 +155,9 @@ export function CsvImportDialog({ open, onOpenChange, onConfirm, onSaved }: Prop
                     value={nameCol}
                     onValueChange={(v) => { setNameCol(v); setParsed([]); }}
                   >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="focus:ring-1 focus:ring-offset-0 focus-visible:ring-1 focus-visible:ring-offset-0">
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       {headers.map((h) => <SelectItem key={h} value={h}>{h}</SelectItem>)}
                     </SelectContent>
@@ -167,7 +169,9 @@ export function CsvImportDialog({ open, onOpenChange, onConfirm, onSaved }: Prop
                     value={phoneCol}
                     onValueChange={(v) => { setPhoneCol(v); setParsed([]); }}
                   >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="focus:ring-1 focus:ring-offset-0 focus-visible:ring-1 focus-visible:ring-offset-0">
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       {headers.map((h) => <SelectItem key={h} value={h}>{h}</SelectItem>)}
                     </SelectContent>
@@ -177,7 +181,7 @@ export function CsvImportDialog({ open, onOpenChange, onConfirm, onSaved }: Prop
 
               {parsed.length > 0 && (
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm">
+                  <div className="flex items-center gap-2 text-sm flex-wrap">
                     <CheckCircle2 className="w-4 h-4 text-primary" />
                     <span><strong>{valid.length}</strong> válidos</span>
                     {invalid.length > 0 && (
@@ -186,6 +190,24 @@ export function CsvImportDialog({ open, onOpenChange, onConfirm, onSaved }: Prop
                         <span><strong>{invalid.length}</strong> inválidos (serão ignorados)</span>
                       </>
                     )}
+                    <TooltipProvider delayDuration={150}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button type="button" className="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+                            <Info className="w-3.5 h-3.5" /> Regra de validação
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="left" className="max-w-xs text-xs">
+                          <p className="font-medium mb-1">Telefone válido (Brasil):</p>
+                          <ul className="list-disc pl-4 space-y-0.5">
+                            <li>Apenas dígitos são considerados</li>
+                            <li>Se vier sem DDI, prefixamos <code>55</code></li>
+                            <li>Resultado: <code>+55</code> + DDD (2) + número (8 ou 9)</li>
+                            <li>Total: 12 ou 13 dígitos após o <code>+</code></li>
+                          </ul>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
                   <div className="max-h-48 overflow-y-auto border rounded-md text-xs">
                     <table className="w-full">
@@ -224,14 +246,33 @@ export function CsvImportDialog({ open, onOpenChange, onConfirm, onSaved }: Prop
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => handleClose(false)}>Cancelar</Button>
+        <DialogFooter className="gap-2 sm:gap-2 flex-col sm:flex-row">
+          <Button variant="outline" onClick={() => handleClose(false)} className="sm:mr-auto">
+            Cancelar
+          </Button>
+          <Button variant="outline" onClick={handleOpenSave} disabled={valid.length === 0}>
+            <Save className="w-4 h-4 mr-2" />
+            Salvar como público
+          </Button>
           <Button onClick={handleConfirm} disabled={valid.length === 0}>
             <Send className="w-4 h-4 mr-2" />
-            Continuar com {valid.length} contato(s)
+            Disparar agora ({valid.length})
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      <SaveAudienceDialog
+        open={saveOpen}
+        onOpenChange={setSaveOpen}
+        leads={buildLeads()}
+        defaultDescription={fileName ? `Importado de ${fileName}` : undefined}
+        onSaved={() => {
+          setSaveOpen(false);
+          onSaved?.();
+          reset();
+          onOpenChange(false);
+        }}
+      />
     </Dialog>
   );
 }
