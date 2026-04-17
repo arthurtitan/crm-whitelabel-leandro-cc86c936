@@ -6,18 +6,24 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, FileText, Send, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Upload, FileText, Send, AlertCircle, CheckCircle2, Save, Info } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { parseCsv, detectColumns, buildLeadsFromCsv, type ParsedLeadRow } from './csvParser';
+import { SaveAudienceDialog } from './SaveAudienceDialog';
 import type { ExtractedLead } from './types';
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Disparar agora com a lista importada */
   onConfirm: (leads: ExtractedLead[]) => void;
+  /** Após salvar como público (recarregar lista) */
+  onSaved?: () => void;
 }
 
-export function CsvImportDialog({ open, onOpenChange, onConfirm }: Props) {
+export function CsvImportDialog({ open, onOpenChange, onConfirm, onSaved }: Props) {
+  const [saveOpen, setSaveOpen] = useState(false);
   const { toast } = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState('');
@@ -70,20 +76,30 @@ export function CsvImportDialog({ open, onOpenChange, onConfirm }: Props) {
   const valid = parsed.filter((p) => p.valid);
   const invalid = parsed.filter((p) => !p.valid);
 
-  const handleConfirm = () => {
-    if (valid.length === 0) {
-      toast({ title: 'Nenhum contato válido', variant: 'destructive' });
-      return;
-    }
-    const leads: ExtractedLead[] = valid.map((p, idx) => ({
+  const buildLeads = (): ExtractedLead[] =>
+    valid.map((p, idx) => ({
       id: `csv-${idx}-${p.telefone}`,
       nome: p.nome,
       cidade: '',
       endereco: '',
       telefone: p.telefone,
     }));
-    onConfirm(leads);
+
+  const handleConfirm = () => {
+    if (valid.length === 0) {
+      toast({ title: 'Nenhum contato válido', variant: 'destructive' });
+      return;
+    }
+    onConfirm(buildLeads());
     reset();
+  };
+
+  const handleOpenSave = () => {
+    if (valid.length === 0) {
+      toast({ title: 'Nenhum contato válido para salvar', variant: 'destructive' });
+      return;
+    }
+    setSaveOpen(true);
   };
 
   const handleClose = (next: boolean) => {

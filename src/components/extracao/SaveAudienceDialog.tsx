@@ -21,10 +21,14 @@ interface Props {
   leads: ExtractedLead[];
   keyword?: string;
   location?: string;
+  /** Origem opcional para descrição padrão (ex: "CSV: arquivo.csv", "CRM — Etapa X") */
+  defaultDescription?: string;
   onSaved?: () => void;
 }
 
-export function SaveAudienceDialog({ open, onOpenChange, leads, keyword, location, onSaved }: Props) {
+export function SaveAudienceDialog({
+  open, onOpenChange, leads, keyword, location, defaultDescription, onSaved,
+}: Props) {
   const { toast } = useToast();
   const { account, user } = useAuth();
   const [name, setName] = useState('');
@@ -43,9 +47,10 @@ export function SaveAudienceDialog({ open, onOpenChange, leads, keyword, locatio
 
     setSaving(true);
     try {
+      const finalDesc = description.trim() || defaultDescription || undefined;
       const payload = {
         name: name.trim(),
-        description: description.trim() || undefined,
+        description: finalDesc,
         keyword,
         location,
         leads: leads.map((l) => ({
@@ -70,7 +75,7 @@ export function SaveAudienceDialog({ open, onOpenChange, leads, keyword, locatio
           .insert({
             account_id: accountId,
             name: payload.name,
-            description: payload.description || null,
+            description: finalDesc || null,
             keyword: keyword || null,
             location: location || null,
             total_leads: leads.length,
@@ -143,17 +148,20 @@ export function SaveAudienceDialog({ open, onOpenChange, leads, keyword, locatio
             <Label htmlFor="audience-desc">Descrição (opcional)</Label>
             <Textarea
               id="audience-desc"
-              placeholder="Notas sobre este público..."
+              placeholder={defaultDescription || 'Notas sobre este público...'}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
             />
           </div>
 
-          {(keyword || location) && (
+          {(keyword || location || defaultDescription) && (
             <div className="text-xs text-muted-foreground space-y-0.5 rounded-md border bg-muted/30 p-3">
               {keyword && <div><strong>Nicho:</strong> {keyword}</div>}
               {location && <div><strong>Localização:</strong> {location}</div>}
+              {defaultDescription && !keyword && !location && (
+                <div><strong>Origem:</strong> {defaultDescription}</div>
+              )}
               <div><strong>Total de leads:</strong> {leads.length}</div>
             </div>
           )}
