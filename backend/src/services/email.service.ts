@@ -193,15 +193,29 @@ export const emailService = {
     bodyHtml: string;
     bodyText?: string;
     ordem?: number;
+    templateId?: string | null;
   }) {
+    // If a template is selected, snapshot subject/body from it as a starting point
+    let subject = data.subject;
+    let bodyHtml = data.bodyHtml;
+    let bodyText = data.bodyText;
+    if (data.templateId) {
+      const tpl = await prisma.emailTemplate.findUnique({ where: { id: data.templateId } });
+      if (tpl) {
+        subject = subject || tpl.subject;
+        bodyHtml = bodyHtml || tpl.bodyHtml;
+        bodyText = bodyText ?? tpl.bodyText ?? undefined;
+      }
+    }
     return prisma.emailCadenceStep.create({
       data: {
         cadenceId,
         dayNumber: data.dayNumber,
-        subject: data.subject,
-        bodyHtml: data.bodyHtml,
-        bodyText: data.bodyText,
+        subject,
+        bodyHtml,
+        bodyText,
         ordem: data.ordem || 0,
+        templateId: data.templateId || null,
       },
     });
   },
@@ -213,6 +227,7 @@ export const emailService = {
     bodyText?: string;
     active?: boolean;
     ordem?: number;
+    templateId?: string | null;
   }) {
     return prisma.emailCadenceStep.update({ where: { id }, data });
   },
