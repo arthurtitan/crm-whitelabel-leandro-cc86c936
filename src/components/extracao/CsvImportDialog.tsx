@@ -62,14 +62,10 @@ export function CsvImportDialog({ open, onOpenChange, onConfirm }: Props) {
     if (f) handleFile(f);
   };
 
-  const recomputeParsed = useCallback(() => {
+  useEffect(() => {
     if (!nameCol || !phoneCol || rows.length === 0) { setParsed([]); return; }
     setParsed(buildLeadsFromCsv(rows, nameCol, phoneCol));
   }, [nameCol, phoneCol, rows]);
-
-  if (rows.length > 0 && parsed.length === 0 && nameCol && phoneCol) {
-    recomputeParsed();
-  }
 
   const valid = parsed.filter((p) => p.valid);
   const invalid = parsed.filter((p) => !p.valid);
