@@ -589,15 +589,28 @@ export default function EmailCampaignsTab() {
                               <DropdownMenuItem onClick={() => setPreviewStep(step)}><Eye className="w-3 h-3 mr-2" /> Preview</DropdownMenuItem>
                               <DropdownMenuItem onClick={() => {
                                 setEditingStep(step);
-                                setStepForm({ dayNumber: step.day_number, subject: step.subject, bodyHtml: step.body_html, bodyText: step.body_text || '' });
+                                setStepForm({ dayNumber: step.day_number, subject: step.subject, bodyHtml: step.body_html, bodyText: step.body_text || '', templateId: step.template_id || null });
                                 setShowStepAI(false); setShowStepDialog(true);
                               }}><Edit2 className="w-3 h-3 mr-2" /> Editar</DropdownMenuItem>
+                              {step.template_id && (
+                                <DropdownMenuItem onClick={() => openTemplateQuickEdit(step.template_id!)}>
+                                  <FileText className="w-3 h-3 mr-2" /> Editar template
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteStep(step.id)}><Trash2 className="w-3 h-3 mr-2" /> Excluir</DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
                         <p className="text-xs text-muted-foreground truncate">{step.subject}</p>
-                        <Badge variant={step.active ? 'default' : 'secondary'} className="mt-1 text-[10px]">{step.active ? '● Ativo' : '● Inativo'}</Badge>
+                        <div className="flex items-center gap-1 mt-1 flex-wrap">
+                          <Badge variant={step.active ? 'default' : 'secondary'} className="text-[10px]">{step.active ? '● Ativo' : '● Inativo'}</Badge>
+                          {step.template_id && (
+                            <Badge variant="outline" className="text-[10px] gap-1">
+                              <FileText className="w-2.5 h-2.5" />
+                              {templates.find(t => t.id === step.template_id)?.name || 'Template'}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                       {idx < steps.length - 1 && <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />}
                     </div>
@@ -607,7 +620,7 @@ export default function EmailCampaignsTab() {
                     onClick={() => {
                       setEditingStep(null);
                       const nextDay = steps.length > 0 ? Math.max(...steps.map(s => s.day_number)) + 2 : 1;
-                      setStepForm({ dayNumber: nextDay, subject: '', bodyHtml: '', bodyText: '' });
+                      setStepForm({ dayNumber: nextDay, subject: '', bodyHtml: '', bodyText: '', templateId: null });
                       setShowStepAI(false); setShowStepDialog(true);
                     }}
                   >
