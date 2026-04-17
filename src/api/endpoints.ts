@@ -164,6 +164,8 @@ export const API_ENDPOINTS = {
     RESUME: '/api/prospecting/resume',
     BATCHES: '/api/prospecting/batches',
     BATCH_LOGS: (batchId: string) => `/api/prospecting/batches/${batchId}/logs`,
+    AUDIENCES: '/api/prospecting/audiences',
+    AUDIENCE: (id: string) => `/api/prospecting/audiences/${id}`,
   },
 
   // ============= INSIGHTS/REPORTS =============
