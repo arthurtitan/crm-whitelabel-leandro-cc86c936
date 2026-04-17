@@ -10,13 +10,15 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Send, Trash2, Users, Loader2, Inbox } from 'lucide-react';
+import { Send, Trash2, Users, Loader2, Inbox, Upload, UserPlus } from 'lucide-react';
 import { useBackend } from '@/config/backend.config';
 import { apiClient } from '@/api/client';
 import { API_ENDPOINTS } from '@/api/endpoints';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { DispatchDialog } from './DispatchDialog';
+import { CsvImportDialog } from './CsvImportDialog';
+import { CrmContactsPickerDialog } from './CrmContactsPickerDialog';
 import type { ExtractedLead } from './types';
 
 interface Audience {
@@ -41,6 +43,15 @@ export function SavedAudiencesTab({ accountId, onDispatchStarted }: Props) {
   const [loadingLeads, setLoadingLeads] = useState<string | null>(null);
   const [dispatchOpen, setDispatchOpen] = useState(false);
   const [dispatchLeads, setDispatchLeads] = useState<ExtractedLead[]>([]);
+  const [csvOpen, setCsvOpen] = useState(false);
+  const [crmOpen, setCrmOpen] = useState(false);
+
+  const openDispatchWith = (leads: ExtractedLead[]) => {
+    setDispatchLeads(leads);
+    setCsvOpen(false);
+    setCrmOpen(false);
+    setDispatchOpen(true);
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -138,6 +149,39 @@ export function SavedAudiencesTab({ accountId, onDispatchStarted }: Props) {
 
   return (
     <>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+        <button
+          type="button"
+          onClick={() => setCsvOpen(true)}
+          className="flex items-start gap-3 p-4 border rounded-lg hover:border-primary hover:bg-muted/30 transition text-left"
+        >
+          <div className="p-2 rounded-md bg-primary/10 text-primary">
+            <Upload className="w-5 h-5" />
+          </div>
+          <div className="flex-1">
+            <p className="font-medium text-sm">Importar planilha (CSV)</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Envie uma lista de contatos para disparar mensagens
+            </p>
+          </div>
+        </button>
+        <button
+          type="button"
+          onClick={() => setCrmOpen(true)}
+          className="flex items-start gap-3 p-4 border rounded-lg hover:border-primary hover:bg-muted/30 transition text-left"
+        >
+          <div className="p-2 rounded-md bg-primary/10 text-primary">
+            <UserPlus className="w-5 h-5" />
+          </div>
+          <div className="flex-1">
+            <p className="font-medium text-sm">Selecionar contatos do CRM</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Dispare para contatos já cadastrados no sistema
+            </p>
+          </div>
+        </button>
+      </div>
+
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
@@ -252,6 +296,18 @@ export function SavedAudiencesTab({ accountId, onDispatchStarted }: Props) {
           setDispatchOpen(false);
           onDispatchStarted?.(batchId);
         }}
+      />
+
+      <CsvImportDialog
+        open={csvOpen}
+        onOpenChange={setCsvOpen}
+        onConfirm={openDispatchWith}
+      />
+
+      <CrmContactsPickerDialog
+        open={crmOpen}
+        onOpenChange={setCrmOpen}
+        onConfirm={openDispatchWith}
       />
     </>
   );
