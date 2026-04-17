@@ -748,79 +748,91 @@ export default function EmailCampaignsTab() {
         </DialogContent>
       </Dialog>
 
-      {/* Step Dialog */}
-      <Dialog open={showStepDialog} onOpenChange={(open) => { setShowStepDialog(open); if (!open) setShowStepAI(false); }}>
-        <DialogContent className={`${showStepAI ? 'max-w-5xl' : 'max-w-2xl'} max-h-[90vh] overflow-hidden flex flex-col`}>
+      {/* Step Dialog — apenas anexa template + dia */}
+      <Dialog open={showStepDialog} onOpenChange={setShowStepDialog}>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              <span>{editingStep ? 'Editar Step' : 'Novo Step'}</span>
-              <Button variant={showStepAI ? 'default' : 'outline'} size="sm" className="text-xs" onClick={() => setShowStepAI(!showStepAI)}>
-                <Sparkles className="w-3.5 h-3.5 mr-1" /> {showStepAI ? 'Fechar IA' : 'Gerar com IA'}
-              </Button>
-            </DialogTitle>
+            <DialogTitle>{editingStep ? 'Editar Step' : 'Novo Step'}</DialogTitle>
           </DialogHeader>
-          <div className={`flex-1 min-h-0 overflow-y-auto ${showStepAI ? 'grid grid-cols-[1fr_320px] gap-0' : ''}`}>
-            <div className={`space-y-4 ${showStepAI ? 'pr-4 overflow-y-auto' : ''}`}>
-              <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-4">
+            {templates.length === 0 ? (
+              <div className="rounded-md border border-dashed border-border p-4 text-center space-y-2">
+                <FileText className="w-6 h-6 mx-auto text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  Nenhum template disponível. Crie um template (manual ou com IA) na aba <strong>Templates</strong> antes de adicionar steps.
+                </p>
+                <Button size="sm" variant="outline" onClick={() => { setShowStepDialog(false); setInnerTab('templates'); }}>
+                  Ir para Templates
+                </Button>
+              </div>
+            ) : (
+              <>
                 <div>
                   <label className="text-sm font-medium">Dia do envio</label>
-                  <Input type="number" min={1} value={stepForm.dayNumber} onChange={e => setStepForm(p => ({ ...p, dayNumber: parseInt(e.target.value) || 1 }))} />
+                  <Input
+                    type="number"
+                    min={1}
+                    value={stepForm.dayNumber}
+                    onChange={e => setStepForm(p => ({ ...p, dayNumber: parseInt(e.target.value) || 1 }))}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Quantos dias após a inscrição este e-mail será enviado.</p>
                 </div>
-                {templates.length > 0 && (
-                  <div>
-                    <label className="text-sm font-medium flex items-center justify-between">
-                      <span>Vincular template</span>
-                      {stepForm.templateId && (
-                        <button
-                          type="button"
-                          className="text-xs text-primary hover:underline flex items-center gap-1"
-                          onClick={() => openTemplateQuickEdit(stepForm.templateId!)}
-                        >
-                          <Edit2 className="w-3 h-3" /> Editar template
-                        </button>
-                      )}
-                    </label>
-                    <Select
-                      value={stepForm.templateId || '__none__'}
-                      onValueChange={(v) => v === '__none__'
-                        ? setStepForm(p => ({ ...p, templateId: null }))
-                        : handleLoadTemplate(v)
-                      }
-                    >
-                      <SelectTrigger><SelectValue placeholder="Selecionar..." /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">Sem template (conteúdo próprio)</SelectItem>
-                        {templates.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                <div>
+                  <label className="text-sm font-medium flex items-center justify-between">
+                    <span>Template <span className="text-destructive">*</span></span>
+                    {stepForm.templateId && (
+                      <button
+                        type="button"
+                        className="text-xs text-primary hover:underline flex items-center gap-1"
+                        onClick={() => openTemplateQuickEdit(stepForm.templateId!)}
+                      >
+                        <Edit2 className="w-3 h-3" /> Editar template
+                      </button>
+                    )}
+                  </label>
+                  <Select
+                    value={stepForm.templateId || ''}
+                    onValueChange={(v) => handleLoadTemplate(v)}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Selecione um template..." /></SelectTrigger>
+                    <SelectContent>
+                      {templates.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    O conteúdo do e-mail vem do template. Para alterar assunto ou corpo, edite o template.
+                  </p>
+                </div>
+                {stepForm.templateId && stepForm.subject && (
+                  <div className="rounded-md bg-muted/40 border border-border p-3 space-y-1">
+                    <p className="text-xs text-muted-foreground">Prévia do assunto</p>
+                    <p className="text-sm font-medium truncate">{stepForm.subject}</p>
                   </div>
                 )}
-              </div>
-              <div>
-                <label className="text-sm font-medium">Assunto</label>
-                <Input value={stepForm.subject} onChange={e => setStepForm(p => ({ ...p, subject: e.target.value }))} placeholder="Assunto do e-mail" />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Corpo do e-mail</label>
-                <EmailRichEditor value={stepForm.bodyHtml} onChange={html => setStepForm(p => ({ ...p, bodyHtml: html }))} placeholder="Escreva o corpo do e-mail..." minHeight="200px" />
-              </div>
-            </div>
-            {showStepAI && (
-              <EmailAIChat
-                onApply={(email) => { setStepForm(p => ({ ...p, subject: email.subject || p.subject, bodyHtml: email.bodyHtml, bodyText: email.bodyText })); toast.info('IA aplicada!'); }}
-                onClose={() => setShowStepAI(false)}
-                context={{ currentSubject: stepForm.subject, currentBodyHtml: stepForm.bodyHtml }}
-              />
+              </>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowStepDialog(false); setShowStepAI(false); }}>Cancelar</Button>
-            {stepForm.bodyHtml.trim() && (
-              <Button variant="secondary" onClick={() => setPreviewStep({ id: editingStep?.id || 'preview', cadence_id: selectedCadence?.id || '', day_number: stepForm.dayNumber, subject: stepForm.subject, body_html: stepForm.bodyHtml, body_text: stepForm.bodyText || null, ordem: 0, active: true, created_at: '', updated_at: '' })}>
+            <Button variant="outline" onClick={() => setShowStepDialog(false)}>Cancelar</Button>
+            {stepForm.templateId && stepForm.bodyHtml.trim() && (
+              <Button
+                variant="secondary"
+                onClick={() => setPreviewStep({
+                  id: editingStep?.id || 'preview',
+                  cadence_id: selectedCadence?.id || '',
+                  day_number: stepForm.dayNumber,
+                  subject: stepForm.subject,
+                  body_html: stepForm.bodyHtml,
+                  body_text: stepForm.bodyText || null,
+                  ordem: 0, active: true, created_at: '', updated_at: '',
+                })}
+              >
                 <Eye className="w-4 h-4 mr-1" /> Preview
               </Button>
             )}
-            <Button onClick={handleSaveStep} disabled={!stepForm.subject.trim() || !stepForm.bodyHtml.trim()}>{editingStep ? 'Salvar' : 'Criar Step'}</Button>
+            <Button onClick={handleSaveStep} disabled={!stepForm.templateId || !stepForm.subject.trim() || !stepForm.bodyHtml.trim()}>
+              {editingStep ? 'Salvar' : 'Criar Step'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
