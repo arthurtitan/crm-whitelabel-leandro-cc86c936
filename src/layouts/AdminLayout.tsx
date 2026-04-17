@@ -25,7 +25,7 @@ import {
   ArrowLeftRight,
   Kanban,
   DollarSign,
-  Activity,
+  
   Wallet,
   Package,
   Calendar,
