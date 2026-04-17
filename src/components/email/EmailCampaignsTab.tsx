@@ -893,6 +893,44 @@ export default function EmailCampaignsTab() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Quick template editor (opened from a step) */}
+      <Dialog open={!!editingTemplate} onOpenChange={(open) => !open && setEditingTemplate(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Editar template: {editingTemplate?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-4">
+            <div>
+              <label className="text-sm font-medium">Nome</label>
+              <Input value={templateForm.name} onChange={e => setTemplateForm(p => ({ ...p, name: e.target.value }))} />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Assunto</label>
+              <Input value={templateForm.subject} onChange={e => setTemplateForm(p => ({ ...p, subject: e.target.value }))} />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Corpo do e-mail</label>
+              <EmailRichEditor
+                value={templateForm.bodyHtml}
+                onChange={html => setTemplateForm(p => ({ ...p, bodyHtml: html }))}
+                placeholder="Conteúdo do template..."
+                minHeight="250px"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              💡 Editar este template atualizará todos os passos vinculados nos próximos envios.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingTemplate(null)}>Cancelar</Button>
+            <Button onClick={handleSaveTemplateQuick} disabled={savingTemplate || !templateForm.name.trim() || !templateForm.subject.trim() || !templateForm.bodyHtml.trim()}>
+              {savingTemplate ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : null}
+              Salvar template
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 
