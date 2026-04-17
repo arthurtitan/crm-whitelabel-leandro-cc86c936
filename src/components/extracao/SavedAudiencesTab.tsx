@@ -297,6 +297,18 @@ export function SavedAudiencesTab({ accountId, onDispatchStarted }: Props) {
           onDispatchStarted?.(batchId);
         }}
       />
+
+      <CsvImportDialog
+        open={csvOpen}
+        onOpenChange={setCsvOpen}
+        onConfirm={openDispatchWith}
+      />
+
+      <CrmContactsPickerDialog
+        open={crmOpen}
+        onOpenChange={setCrmOpen}
+        onConfirm={openDispatchWith}
+      />
     </>
   );
 }
