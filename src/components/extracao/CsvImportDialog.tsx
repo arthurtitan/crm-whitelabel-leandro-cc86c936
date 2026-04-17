@@ -6,18 +6,24 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, FileText, Send, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Upload, FileText, Send, AlertCircle, CheckCircle2, Save, Info } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { parseCsv, detectColumns, buildLeadsFromCsv, type ParsedLeadRow } from './csvParser';
+import { SaveAudienceDialog } from './SaveAudienceDialog';
 import type { ExtractedLead } from './types';
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Disparar agora com a lista importada */
   onConfirm: (leads: ExtractedLead[]) => void;
+  /** Após salvar como público (recarregar lista) */
+  onSaved?: () => void;
 }
 
-export function CsvImportDialog({ open, onOpenChange, onConfirm }: Props) {
+export function CsvImportDialog({ open, onOpenChange, onConfirm, onSaved }: Props) {
+  const [saveOpen, setSaveOpen] = useState(false);
   const { toast } = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState('');
@@ -70,20 +76,30 @@ export function CsvImportDialog({ open, onOpenChange, onConfirm }: Props) {
   const valid = parsed.filter((p) => p.valid);
   const invalid = parsed.filter((p) => !p.valid);
 
-  const handleConfirm = () => {
-    if (valid.length === 0) {
-      toast({ title: 'Nenhum contato válido', variant: 'destructive' });
-      return;
-    }
-    const leads: ExtractedLead[] = valid.map((p, idx) => ({
+  const buildLeads = (): ExtractedLead[] =>
+    valid.map((p, idx) => ({
       id: `csv-${idx}-${p.telefone}`,
       nome: p.nome,
       cidade: '',
       endereco: '',
       telefone: p.telefone,
     }));
-    onConfirm(leads);
+
+  const handleConfirm = () => {
+    if (valid.length === 0) {
+      toast({ title: 'Nenhum contato válido', variant: 'destructive' });
+      return;
+    }
+    onConfirm(buildLeads());
     reset();
+  };
+
+  const handleOpenSave = () => {
+    if (valid.length === 0) {
+      toast({ title: 'Nenhum contato válido para salvar', variant: 'destructive' });
+      return;
+    }
+    setSaveOpen(true);
   };
 
   const handleClose = (next: boolean) => {
@@ -139,7 +155,9 @@ export function CsvImportDialog({ open, onOpenChange, onConfirm }: Props) {
                     value={nameCol}
                     onValueChange={(v) => { setNameCol(v); setParsed([]); }}
                   >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="focus:ring-1 focus:ring-offset-0 focus-visible:ring-1 focus-visible:ring-offset-0">
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       {headers.map((h) => <SelectItem key={h} value={h}>{h}</SelectItem>)}
                     </SelectContent>
@@ -151,7 +169,9 @@ export function CsvImportDialog({ open, onOpenChange, onConfirm }: Props) {
                     value={phoneCol}
                     onValueChange={(v) => { setPhoneCol(v); setParsed([]); }}
                   >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="focus:ring-1 focus:ring-offset-0 focus-visible:ring-1 focus-visible:ring-offset-0">
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       {headers.map((h) => <SelectItem key={h} value={h}>{h}</SelectItem>)}
                     </SelectContent>
@@ -161,7 +181,7 @@ export function CsvImportDialog({ open, onOpenChange, onConfirm }: Props) {
 
               {parsed.length > 0 && (
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm">
+                  <div className="flex items-center gap-2 text-sm flex-wrap">
                     <CheckCircle2 className="w-4 h-4 text-primary" />
                     <span><strong>{valid.length}</strong> válidos</span>
                     {invalid.length > 0 && (
@@ -170,6 +190,24 @@ export function CsvImportDialog({ open, onOpenChange, onConfirm }: Props) {
                         <span><strong>{invalid.length}</strong> inválidos (serão ignorados)</span>
                       </>
                     )}
+                    <TooltipProvider delayDuration={150}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button type="button" className="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+                            <Info className="w-3.5 h-3.5" /> Regra de validação
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="left" className="max-w-xs text-xs">
+                          <p className="font-medium mb-1">Telefone válido (Brasil):</p>
+                          <ul className="list-disc pl-4 space-y-0.5">
+                            <li>Apenas dígitos são considerados</li>
+                            <li>Se vier sem DDI, prefixamos <code>55</code></li>
+                            <li>Resultado: <code>+55</code> + DDD (2) + número (8 ou 9)</li>
+                            <li>Total: 12 ou 13 dígitos após o <code>+</code></li>
+                          </ul>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
                   <div className="max-h-48 overflow-y-auto border rounded-md text-xs">
                     <table className="w-full">
@@ -208,14 +246,33 @@ export function CsvImportDialog({ open, onOpenChange, onConfirm }: Props) {
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => handleClose(false)}>Cancelar</Button>
+        <DialogFooter className="gap-2 sm:gap-2 flex-col sm:flex-row">
+          <Button variant="outline" onClick={() => handleClose(false)} className="sm:mr-auto">
+            Cancelar
+          </Button>
+          <Button variant="outline" onClick={handleOpenSave} disabled={valid.length === 0}>
+            <Save className="w-4 h-4 mr-2" />
+            Salvar como público
+          </Button>
           <Button onClick={handleConfirm} disabled={valid.length === 0}>
             <Send className="w-4 h-4 mr-2" />
-            Continuar com {valid.length} contato(s)
+            Disparar agora ({valid.length})
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      <SaveAudienceDialog
+        open={saveOpen}
+        onOpenChange={setSaveOpen}
+        leads={buildLeads()}
+        defaultDescription={fileName ? `Importado de ${fileName}` : undefined}
+        onSaved={() => {
+          setSaveOpen(false);
+          onSaved?.();
+          reset();
+          onOpenChange(false);
+        }}
+      />
     </Dialog>
   );
 }

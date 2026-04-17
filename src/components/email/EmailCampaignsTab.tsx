@@ -94,16 +94,35 @@ export default function EmailCampaignsTab() {
 
   // Templates
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
-  const selectedCampaignIdRef = useRef<string | null>(null);
-  const selectedCadenceIdRef = useRef<string | null>(null);
+  const SELECTED_CAMPAIGN_KEY = accountId ? `email:selectedCampaignId:${accountId}` : '';
+  const SELECTED_CADENCE_KEY = accountId ? `email:selectedCadenceId:${accountId}` : '';
+
+  const selectedCampaignIdRef = useRef<string | null>(
+    typeof window !== 'undefined' && SELECTED_CAMPAIGN_KEY
+      ? sessionStorage.getItem(SELECTED_CAMPAIGN_KEY)
+      : null
+  );
+  const selectedCadenceIdRef = useRef<string | null>(
+    typeof window !== 'undefined' && SELECTED_CADENCE_KEY
+      ? sessionStorage.getItem(SELECTED_CADENCE_KEY)
+      : null
+  );
 
   useEffect(() => {
     selectedCampaignIdRef.current = selectedCampaign?.id || null;
-  }, [selectedCampaign]);
+    if (SELECTED_CAMPAIGN_KEY) {
+      if (selectedCampaign?.id) sessionStorage.setItem(SELECTED_CAMPAIGN_KEY, selectedCampaign.id);
+      else sessionStorage.removeItem(SELECTED_CAMPAIGN_KEY);
+    }
+  }, [selectedCampaign, SELECTED_CAMPAIGN_KEY]);
 
   useEffect(() => {
     selectedCadenceIdRef.current = selectedCadence?.id || null;
-  }, [selectedCadence]);
+    if (SELECTED_CADENCE_KEY) {
+      if (selectedCadence?.id) sessionStorage.setItem(SELECTED_CADENCE_KEY, selectedCadence.id);
+      else sessionStorage.removeItem(SELECTED_CADENCE_KEY);
+    }
+  }, [selectedCadence, SELECTED_CADENCE_KEY]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
