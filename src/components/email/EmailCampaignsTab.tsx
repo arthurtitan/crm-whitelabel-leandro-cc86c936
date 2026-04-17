@@ -768,10 +768,30 @@ export default function EmailCampaignsTab() {
                 </div>
                 {templates.length > 0 && (
                   <div>
-                    <label className="text-sm font-medium">Usar template</label>
-                    <Select onValueChange={handleLoadTemplate}>
+                    <label className="text-sm font-medium flex items-center justify-between">
+                      <span>Vincular template</span>
+                      {stepForm.templateId && (
+                        <button
+                          type="button"
+                          className="text-xs text-primary hover:underline flex items-center gap-1"
+                          onClick={() => openTemplateQuickEdit(stepForm.templateId!)}
+                        >
+                          <Edit2 className="w-3 h-3" /> Editar template
+                        </button>
+                      )}
+                    </label>
+                    <Select
+                      value={stepForm.templateId || '__none__'}
+                      onValueChange={(v) => v === '__none__'
+                        ? setStepForm(p => ({ ...p, templateId: null }))
+                        : handleLoadTemplate(v)
+                      }
+                    >
                       <SelectTrigger><SelectValue placeholder="Selecionar..." /></SelectTrigger>
-                      <SelectContent>{templates.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
+                      <SelectContent>
+                        <SelectItem value="__none__">Sem template (conteúdo próprio)</SelectItem>
+                        {templates.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                      </SelectContent>
                     </Select>
                   </div>
                 )}
