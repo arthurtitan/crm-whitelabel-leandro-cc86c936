@@ -12,7 +12,7 @@ import type { ExtractedLead, ApiUsage } from './types';
 
 interface Props {
   accountId: string;
-  onResults: (leads: ExtractedLead[], usage?: ApiUsage) => void;
+  onResults: (leads: ExtractedLead[], usage?: ApiUsage, meta?: { keyword: string; location: string }) => void;
   isLoading: boolean;
   setIsLoading: (v: boolean) => void;
 }
@@ -66,7 +66,7 @@ export function ExtractionSearchForm({ accountId, onResults, isLoading, setIsLoa
         google_maps_url: l.google_maps_url || '',
       }));
 
-      onResults(leads, data.usage);
+      onResults(leads, data.usage, { keyword: nicho.trim(), location: localizacao.trim() });
       toast({ title: `${leads.length} leads encontrados!` });
     } catch (err: any) {
       console.error('Extraction error:', err);
