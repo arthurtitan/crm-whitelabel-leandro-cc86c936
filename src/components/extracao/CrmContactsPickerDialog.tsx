@@ -273,14 +273,32 @@ export function CrmContactsPickerDialog({ open, onOpenChange, onConfirm, onSaved
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+        <DialogFooter className="gap-2 sm:gap-2 flex-col sm:flex-row">
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="sm:mr-auto">
+            Cancelar
+          </Button>
+          <Button variant="outline" onClick={handleOpenSave} disabled={selectedIds.size === 0}>
+            <Save className="w-4 h-4 mr-2" />
+            Salvar como público
+          </Button>
           <Button onClick={handleConfirm} disabled={selectedIds.size === 0}>
             <Send className="w-4 h-4 mr-2" />
-            Continuar com {selectedIds.size} contato(s)
+            Disparar agora ({selectedIds.size})
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      <SaveAudienceDialog
+        open={saveOpen}
+        onOpenChange={setSaveOpen}
+        leads={buildLeads()}
+        defaultDescription={stageName ? `CRM — Etapa: ${stageName}` : 'Selecionado do CRM'}
+        onSaved={() => {
+          setSaveOpen(false);
+          onSaved?.();
+          onOpenChange(false);
+        }}
+      />
     </Dialog>
   );
 }
