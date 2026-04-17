@@ -1139,6 +1139,100 @@ export type Database = {
           },
         ]
       }
+      prospecting_audience_leads: {
+        Row: {
+          address: string | null
+          audience_id: string
+          category: string | null
+          created_at: string
+          id: string
+          name: string
+          phone: string | null
+          rating: number | null
+          raw_data: Json | null
+          website: string | null
+        }
+        Insert: {
+          address?: string | null
+          audience_id: string
+          category?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          phone?: string | null
+          rating?: number | null
+          raw_data?: Json | null
+          website?: string | null
+        }
+        Update: {
+          address?: string | null
+          audience_id?: string
+          category?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          phone?: string | null
+          rating?: number | null
+          raw_data?: Json | null
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prospecting_audience_leads_audience_id_fkey"
+            columns: ["audience_id"]
+            isOneToOne: false
+            referencedRelation: "prospecting_audiences"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prospecting_audiences: {
+        Row: {
+          account_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          keyword: string | null
+          location: string | null
+          name: string
+          total_leads: number
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          keyword?: string | null
+          location?: string | null
+          name: string
+          total_leads?: number
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          keyword?: string | null
+          location?: string | null
+          name?: string
+          total_leads?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prospecting_audiences_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       resolution_logs: {
         Row: {
           account_id: string
