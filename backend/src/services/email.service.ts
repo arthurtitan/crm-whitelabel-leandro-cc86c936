@@ -193,15 +193,29 @@ export const emailService = {
     bodyHtml: string;
     bodyText?: string;
     ordem?: number;
+    templateId?: string | null;
   }) {
+    // If a template is selected, snapshot subject/body from it as a starting point
+    let subject = data.subject;
+    let bodyHtml = data.bodyHtml;
+    let bodyText = data.bodyText;
+    if (data.templateId) {
+      const tpl = await prisma.emailTemplate.findUnique({ where: { id: data.templateId } });
+      if (tpl) {
+        subject = subject || tpl.subject;
+        bodyHtml = bodyHtml || tpl.bodyHtml;
+        bodyText = bodyText ?? tpl.bodyText ?? undefined;
+      }
+    }
     return prisma.emailCadenceStep.create({
       data: {
         cadenceId,
         dayNumber: data.dayNumber,
-        subject: data.subject,
-        bodyHtml: data.bodyHtml,
-        bodyText: data.bodyText,
+        subject,
+        bodyHtml,
+        bodyText,
         ordem: data.ordem || 0,
+        templateId: data.templateId || null,
       },
     });
   },
@@ -213,6 +227,7 @@ export const emailService = {
     bodyText?: string;
     active?: boolean;
     ordem?: number;
+    templateId?: string | null;
   }) {
     return prisma.emailCadenceStep.update({ where: { id }, data });
   },
@@ -438,14 +453,27 @@ export const emailService = {
             continue;
           }
 
+          // Resolve content: if step has a templateId, use the latest template content (so editing the template propagates)
+          let stepSubject = currentStep.subject;
+          let stepBodyHtml = currentStep.bodyHtml;
+          let stepBodyText = currentStep.bodyText;
+          if ((currentStep as any).templateId) {
+            const tpl = await prisma.emailTemplate.findUnique({ where: { id: (currentStep as any).templateId } });
+            if (tpl) {
+              stepSubject = tpl.subject;
+              stepBodyHtml = tpl.bodyHtml;
+              stepBodyText = tpl.bodyText;
+            }
+          }
+
           // Replace variables
           const replacements: Record<string, string> = {
             '{nome}': enrollment.contact.nome || '',
             '{email}': enrollment.contact.email || '',
           };
 
-          let subject = currentStep.subject;
-          let bodyHtml = currentStep.bodyHtml;
+          let subject = stepSubject;
+          let bodyHtml = stepBodyHtml;
           for (const [key, val] of Object.entries(replacements)) {
             subject = subject.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), val);
             bodyHtml = bodyHtml.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), val);
@@ -470,7 +498,7 @@ export const emailService = {
               to: enrollment.contact.email!,
               subject,
               html: bodyHtml,
-              text: currentStep.bodyText || undefined,
+              text: stepBodyText || undefined,
               fromEmail: creds.fromEmail,
               fromName: creds.fromName,
               apiKey: creds.apiKey,

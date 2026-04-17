@@ -79,9 +79,14 @@ export default function EmailCampaignsTab() {
   // Step state
   const [showStepDialog, setShowStepDialog] = useState(false);
   const [editingStep, setEditingStep] = useState<EmailCadenceStep | null>(null);
-  const [stepForm, setStepForm] = useState({ dayNumber: 1, subject: '', bodyHtml: '', bodyText: '' });
+  const [stepForm, setStepForm] = useState<{ dayNumber: number; subject: string; bodyHtml: string; bodyText: string; templateId: string | null }>({ dayNumber: 1, subject: '', bodyHtml: '', bodyText: '', templateId: null });
   const [showStepAI, setShowStepAI] = useState(false);
   const [previewStep, setPreviewStep] = useState<EmailCadenceStep | null>(null);
+
+  // Quick template editor (opened from a step)
+  const [editingTemplate, setEditingTemplate] = useState<EmailTemplate | null>(null);
+  const [templateForm, setTemplateForm] = useState({ name: '', subject: '', bodyHtml: '', bodyText: '' });
+  const [savingTemplate, setSavingTemplate] = useState(false);
 
   // Rule state
   const [showRuleDialog, setShowRuleDialog] = useState(false);
@@ -260,7 +265,7 @@ export default function EmailCampaignsTab() {
         toast.success('Step criado!');
       }
       setShowStepDialog(false);
-      setStepForm({ dayNumber: 1, subject: '', bodyHtml: '', bodyText: '' });
+      setStepForm({ dayNumber: 1, subject: '', bodyHtml: '', bodyText: '', templateId: null });
       setEditingStep(null);
       setShowStepAI(false);
       await loadData();
@@ -306,8 +311,34 @@ export default function EmailCampaignsTab() {
   const handleLoadTemplate = (templateId: string) => {
     const t = templates.find(t => t.id === templateId);
     if (t) {
-      setStepForm(prev => ({ ...prev, subject: t.subject, bodyHtml: t.body_html, bodyText: t.body_text || '' }));
-      toast.info(`Template "${t.name}" carregado!`);
+      setStepForm(prev => ({ ...prev, subject: t.subject, bodyHtml: t.body_html, bodyText: t.body_text || '', templateId: t.id }));
+      toast.info(`Template "${t.name}" vinculado! Editar o template atualizará todos os steps vinculados.`);
+    }
+  };
+
+  const openTemplateQuickEdit = (templateId: string) => {
+    const t = templates.find(t => t.id === templateId);
+    if (!t) return toast.error('Template não encontrado');
+    setEditingTemplate(t);
+    setTemplateForm({ name: t.name, subject: t.subject, bodyHtml: t.body_html, bodyText: t.body_text || '' });
+  };
+
+  const handleSaveTemplateQuick = async () => {
+    if (!editingTemplate) return;
+    setSavingTemplate(true);
+    try {
+      const updated = await emailService.updateTemplate(editingTemplate.id, templateForm);
+      setTemplates(prev => prev.map(t => t.id === updated.id ? updated : t));
+      // If currently editing a step linked to this template, sync the form fields too
+      if (stepForm.templateId === updated.id) {
+        setStepForm(prev => ({ ...prev, subject: updated.subject, bodyHtml: updated.body_html, bodyText: updated.body_text || '' }));
+      }
+      toast.success('Template atualizado! Próximos envios usarão a versão nova.');
+      setEditingTemplate(null);
+    } catch (err: any) {
+      toast.error(err?.message || 'Erro ao salvar template');
+    } finally {
+      setSavingTemplate(false);
     }
   };
 
@@ -558,15 +589,28 @@ export default function EmailCampaignsTab() {
                               <DropdownMenuItem onClick={() => setPreviewStep(step)}><Eye className="w-3 h-3 mr-2" /> Preview</DropdownMenuItem>
                               <DropdownMenuItem onClick={() => {
                                 setEditingStep(step);
-                                setStepForm({ dayNumber: step.day_number, subject: step.subject, bodyHtml: step.body_html, bodyText: step.body_text || '' });
+                                setStepForm({ dayNumber: step.day_number, subject: step.subject, bodyHtml: step.body_html, bodyText: step.body_text || '', templateId: step.template_id || null });
                                 setShowStepAI(false); setShowStepDialog(true);
                               }}><Edit2 className="w-3 h-3 mr-2" /> Editar</DropdownMenuItem>
+                              {step.template_id && (
+                                <DropdownMenuItem onClick={() => openTemplateQuickEdit(step.template_id!)}>
+                                  <FileText className="w-3 h-3 mr-2" /> Editar template
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteStep(step.id)}><Trash2 className="w-3 h-3 mr-2" /> Excluir</DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
                         <p className="text-xs text-muted-foreground truncate">{step.subject}</p>
-                        <Badge variant={step.active ? 'default' : 'secondary'} className="mt-1 text-[10px]">{step.active ? '● Ativo' : '● Inativo'}</Badge>
+                        <div className="flex items-center gap-1 mt-1 flex-wrap">
+                          <Badge variant={step.active ? 'default' : 'secondary'} className="text-[10px]">{step.active ? '● Ativo' : '● Inativo'}</Badge>
+                          {step.template_id && (
+                            <Badge variant="outline" className="text-[10px] gap-1">
+                              <FileText className="w-2.5 h-2.5" />
+                              {templates.find(t => t.id === step.template_id)?.name || 'Template'}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                       {idx < steps.length - 1 && <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />}
                     </div>
@@ -576,7 +620,7 @@ export default function EmailCampaignsTab() {
                     onClick={() => {
                       setEditingStep(null);
                       const nextDay = steps.length > 0 ? Math.max(...steps.map(s => s.day_number)) + 2 : 1;
-                      setStepForm({ dayNumber: nextDay, subject: '', bodyHtml: '', bodyText: '' });
+                      setStepForm({ dayNumber: nextDay, subject: '', bodyHtml: '', bodyText: '', templateId: null });
                       setShowStepAI(false); setShowStepDialog(true);
                     }}
                   >
@@ -724,10 +768,30 @@ export default function EmailCampaignsTab() {
                 </div>
                 {templates.length > 0 && (
                   <div>
-                    <label className="text-sm font-medium">Usar template</label>
-                    <Select onValueChange={handleLoadTemplate}>
+                    <label className="text-sm font-medium flex items-center justify-between">
+                      <span>Vincular template</span>
+                      {stepForm.templateId && (
+                        <button
+                          type="button"
+                          className="text-xs text-primary hover:underline flex items-center gap-1"
+                          onClick={() => openTemplateQuickEdit(stepForm.templateId!)}
+                        >
+                          <Edit2 className="w-3 h-3" /> Editar template
+                        </button>
+                      )}
+                    </label>
+                    <Select
+                      value={stepForm.templateId || '__none__'}
+                      onValueChange={(v) => v === '__none__'
+                        ? setStepForm(p => ({ ...p, templateId: null }))
+                        : handleLoadTemplate(v)
+                      }
+                    >
                       <SelectTrigger><SelectValue placeholder="Selecionar..." /></SelectTrigger>
-                      <SelectContent>{templates.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
+                      <SelectContent>
+                        <SelectItem value="__none__">Sem template (conteúdo próprio)</SelectItem>
+                        {templates.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                      </SelectContent>
                     </Select>
                   </div>
                 )}
@@ -829,6 +893,44 @@ export default function EmailCampaignsTab() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Quick template editor (opened from a step) */}
+      <Dialog open={!!editingTemplate} onOpenChange={(open) => !open && setEditingTemplate(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Editar template: {editingTemplate?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-4">
+            <div>
+              <label className="text-sm font-medium">Nome</label>
+              <Input value={templateForm.name} onChange={e => setTemplateForm(p => ({ ...p, name: e.target.value }))} />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Assunto</label>
+              <Input value={templateForm.subject} onChange={e => setTemplateForm(p => ({ ...p, subject: e.target.value }))} />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Corpo do e-mail</label>
+              <EmailRichEditor
+                value={templateForm.bodyHtml}
+                onChange={html => setTemplateForm(p => ({ ...p, bodyHtml: html }))}
+                placeholder="Conteúdo do template..."
+                minHeight="250px"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              💡 Editar este template atualizará todos os passos vinculados nos próximos envios.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingTemplate(null)}>Cancelar</Button>
+            <Button onClick={handleSaveTemplateQuick} disabled={savingTemplate || !templateForm.name.trim() || !templateForm.subject.trim() || !templateForm.bodyHtml.trim()}>
+              {savingTemplate ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : null}
+              Salvar template
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 

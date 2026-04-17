@@ -717,22 +717,25 @@ model EmailCadenceRule {
 // EMAIL CADENCE STEPS
 // ============================================
 model EmailCadenceStep {
-  id        String  @id @default(uuid()) @db.Uuid
-  cadenceId String  @map("cadence_id") @db.Uuid
-  dayNumber Int     @default(1) @map("day_number")
-  subject   String  @db.VarChar(500)
-  bodyHtml  String  @map("body_html")
-  bodyText  String? @map("body_text")
-  active    Boolean @default(true)
-  ordem     Int     @default(0)
+  id         String  @id @default(uuid()) @db.Uuid
+  cadenceId  String  @map("cadence_id") @db.Uuid
+  templateId String? @map("template_id") @db.Uuid
+  dayNumber  Int     @default(1) @map("day_number")
+  subject    String  @db.VarChar(500)
+  bodyHtml   String  @map("body_html")
+  bodyText   String? @map("body_text")
+  active     Boolean @default(true)
+  ordem      Int     @default(0)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  cadence    EmailCadence  @relation(fields: [cadenceId], references: [id], onDelete: Cascade)
+  cadence    EmailCadence   @relation(fields: [cadenceId], references: [id], onDelete: Cascade)
+  template   EmailTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
   emailSends EmailSend[]
 
   @@index([cadenceId])
+  @@index([templateId])
   @@map("email_cadence_steps")
 }
 
@@ -752,7 +755,8 @@ model EmailTemplate {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  account            Account            @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  emailCadenceSteps  EmailCadenceStep[]
 
   @@index([accountId])
   @@map("email_templates")
