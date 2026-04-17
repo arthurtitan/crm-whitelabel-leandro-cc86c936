@@ -6,7 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Search, Loader2, Send, Users } from 'lucide-react';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import { Search, Loader2, Send, Users, Filter } from 'lucide-react';
 import { useBackend } from '@/config/backend.config';
 import { apiClient } from '@/api/client';
 import { API_ENDPOINTS } from '@/api/endpoints';
@@ -22,42 +25,90 @@ interface CrmContact {
   email: string | null;
 }
 
+interface StageTag {
+  id: string;
+  name: string;
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: (leads: ExtractedLead[]) => void;
 }
 
+const ALL_STAGES = '__all__';
+
 export function CrmContactsPickerDialog({ open, onOpenChange, onConfirm }: Props) {
   const { toast } = useToast();
   const [contacts, setContacts] = useState<CrmContact[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [stageId, setStageId] = useState<string>(ALL_STAGES);
+  const [stages, setStages] = useState<StageTag[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  const load = useCallback(async (term: string) => {
+  const loadStages = useCallback(async () => {
+    try {
+      let data: StageTag[];
+      if (useBackend) {
+        const res = await apiClient.get<any>(`${API_ENDPOINTS.TAGS.LIST}?type=stage&ativo=true`);
+        const payload = (res as any).data || res;
+        data = (Array.isArray(payload) ? payload : payload.data || []).map((t: any) => ({ id: t.id, name: t.name }));
+      } else {
+        const { data: rows } = await supabase
+          .from('tags')
+          .select('id, name')
+          .eq('type', 'stage')
+          .eq('ativo', true)
+          .order('ordem');
+        data = (rows as any) || [];
+      }
+      setStages(data);
+    } catch {
+      // silencioso, filtro é opcional
+    }
+  }, []);
+
+  const load = useCallback(async (term: string, filterStageId: string) => {
     setLoading(true);
     try {
       let data: CrmContact[];
       if (useBackend) {
-        const res = await apiClient.get<any>(
-          `${API_ENDPOINTS.CONTACTS.LIST}?limit=200${term ? `&search=${encodeURIComponent(term)}` : ''}`
-        );
+        const params = new URLSearchParams({ limit: '200' });
+        if (term) params.set('search', term);
+        if (filterStageId && filterStageId !== ALL_STAGES) params.set('tagId', filterStageId);
+        const res = await apiClient.get<any>(`${API_ENDPOINTS.CONTACTS.LIST}?${params.toString()}`);
         const payload = (res as any).data || res;
         data = Array.isArray(payload) ? payload : payload.data || payload.contacts || [];
       } else {
-        let q = supabase
-          .from('contacts')
-          .select('id, nome, telefone, email')
-          .not('telefone', 'is', null)
-          .order('created_at', { ascending: false })
-          .limit(200);
-        if (term) q = q.or(`nome.ilike.%${term}%,telefone.ilike.%${term}%`);
-        const { data: rows, error } = await q;
-        if (error) throw error;
-        data = rows || [];
+        if (filterStageId && filterStageId !== ALL_STAGES) {
+          const { data: rows, error } = await supabase
+            .from('lead_tags')
+            .select('contacts!inner(id, nome, telefone, email)')
+            .eq('tag_id', filterStageId)
+            .not('contacts.telefone', 'is', null)
+            .limit(200);
+          if (error) throw error;
+          data = ((rows as any) || []).map((r: any) => r.contacts).filter(Boolean);
+          if (term) {
+            const t = term.toLowerCase();
+            data = data.filter(
+              (c) => c.nome?.toLowerCase().includes(t) || c.telefone?.toLowerCase().includes(t)
+            );
+          }
+        } else {
+          let q = supabase
+            .from('contacts')
+            .select('id, nome, telefone, email')
+            .not('telefone', 'is', null)
+            .order('created_at', { ascending: false })
+            .limit(200);
+          if (term) q = q.or(`nome.ilike.%${term}%,telefone.ilike.%${term}%`);
+          const { data: rows, error } = await q;
+          if (error) throw error;
+          data = rows || [];
+        }
       }
-      // Keep only those with a phone
       setContacts(data.filter((c) => c.telefone && c.telefone.trim()));
     } catch (err: any) {
       toast({ title: 'Erro ao carregar contatos', description: err?.message, variant: 'destructive' });
@@ -68,17 +119,19 @@ export function CrmContactsPickerDialog({ open, onOpenChange, onConfirm }: Props
 
   useEffect(() => {
     if (!open) return;
-    load('');
+    loadStages();
+    load('', ALL_STAGES);
     setSelectedIds(new Set());
     setSearch('');
-  }, [open, load]);
+    setStageId(ALL_STAGES);
+  }, [open, load, loadStages]);
 
-  // Debounced search
+  // Debounced search + stage filter
   useEffect(() => {
     if (!open) return;
-    const id = setTimeout(() => load(search), 350);
+    const id = setTimeout(() => load(search, stageId), 350);
     return () => clearTimeout(id);
-  }, [search, open, load]);
+  }, [search, stageId, open, load]);
 
   const toggle = (id: string) => {
     setSelectedIds((prev) => {
@@ -130,14 +183,28 @@ export function CrmContactsPickerDialog({ open, onOpenChange, onConfirm }: Props
         </DialogHeader>
 
         <div className="space-y-3 flex-1 overflow-hidden flex flex-col py-2">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nome ou telefone..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_220px] gap-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+              <Input
+                placeholder="Buscar por nome ou telefone..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9 focus-visible:ring-1 focus-visible:ring-offset-0"
+              />
+            </div>
+            <Select value={stageId} onValueChange={setStageId}>
+              <SelectTrigger className="focus:ring-1 focus:ring-offset-0">
+                <Filter className="w-4 h-4 mr-1 text-muted-foreground" />
+                <SelectValue placeholder="Filtrar por etapa" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_STAGES}>Todas as etapas</SelectItem>
+                {stages.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="flex items-center justify-between text-sm">
