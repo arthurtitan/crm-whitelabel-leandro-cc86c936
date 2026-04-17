@@ -94,7 +94,7 @@ export const emailCloudService = {
   },
 
   // ==================== STEPS ====================
-  async createStep(cadenceId: string, input: { dayNumber: number; subject: string; bodyHtml: string; bodyText?: string; ordem?: number }): Promise<EmailCadenceStep> {
+  async createStep(cadenceId: string, input: { dayNumber: number; subject: string; bodyHtml: string; bodyText?: string; ordem?: number; templateId?: string | null }): Promise<EmailCadenceStep> {
     const { data, error } = await supabase
       .from('email_cadence_steps')
       .insert({
@@ -104,14 +104,15 @@ export const emailCloudService = {
         body_html: input.bodyHtml,
         body_text: input.bodyText || null,
         ordem: input.ordem || 0,
-      })
+        template_id: input.templateId || null,
+      } as any)
       .select()
       .single();
     if (error) throw new Error(error.message);
     return data as EmailCadenceStep;
   },
 
-  async updateStep(id: string, input: Partial<{ dayNumber: number; subject: string; bodyHtml: string; bodyText: string; active: boolean; ordem: number }>): Promise<EmailCadenceStep> {
+  async updateStep(id: string, input: Partial<{ dayNumber: number; subject: string; bodyHtml: string; bodyText: string; active: boolean; ordem: number; templateId: string | null }>): Promise<EmailCadenceStep> {
     const updateData: any = {};
     if (input.dayNumber !== undefined) updateData.day_number = input.dayNumber;
     if (input.subject !== undefined) updateData.subject = input.subject;
@@ -119,6 +120,7 @@ export const emailCloudService = {
     if (input.bodyText !== undefined) updateData.body_text = input.bodyText;
     if (input.active !== undefined) updateData.active = input.active;
     if (input.ordem !== undefined) updateData.ordem = input.ordem;
+    if (input.templateId !== undefined) updateData.template_id = input.templateId;
 
     const { data, error } = await supabase
       .from('email_cadence_steps')

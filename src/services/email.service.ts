@@ -12,6 +12,7 @@ import { API_ENDPOINTS } from '@/api/endpoints';
 export interface EmailCadenceStep {
   id: string;
   cadence_id: string;
+  template_id?: string | null;
   day_number: number;
   subject: string;
   body_html: string;
@@ -201,6 +202,7 @@ function mapStep(s: any): EmailCadenceStep {
   return {
     id: s.id,
     cadence_id: s.cadence_id ?? s.cadenceId,
+    template_id: s.template_id ?? s.templateId ?? null,
     day_number: s.day_number ?? s.dayNumber,
     subject: s.subject,
     body_html: s.body_html ?? s.bodyHtml,
@@ -278,12 +280,12 @@ export const emailApiService = {
   },
 
   // Steps
-  async createStep(cadenceId: string, data: { dayNumber: number; subject: string; bodyHtml: string; bodyText?: string; ordem?: number }): Promise<EmailCadenceStep> {
+  async createStep(cadenceId: string, data: { dayNumber: number; subject: string; bodyHtml: string; bodyText?: string; ordem?: number; templateId?: string | null }): Promise<EmailCadenceStep> {
     const res = await apiClient.post<any>(API_ENDPOINTS.EMAIL.CADENCE_STEPS(cadenceId), data);
     return mapStep(unwrap(res));
   },
 
-  async updateStep(id: string, data: Partial<{ dayNumber: number; subject: string; bodyHtml: string; bodyText: string; active: boolean; ordem: number }>): Promise<EmailCadenceStep> {
+  async updateStep(id: string, data: Partial<{ dayNumber: number; subject: string; bodyHtml: string; bodyText: string; active: boolean; ordem: number; templateId: string | null }>): Promise<EmailCadenceStep> {
     const res = await apiClient.put<any>(API_ENDPOINTS.EMAIL.STEP(id), data);
     return mapStep(unwrap(res));
   },

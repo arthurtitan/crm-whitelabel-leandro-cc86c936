@@ -498,7 +498,7 @@ export const emailService = {
               to: enrollment.contact.email!,
               subject,
               html: bodyHtml,
-              text: currentStep.bodyText || undefined,
+              text: stepBodyText || undefined,
               fromEmail: creds.fromEmail,
               fromName: creds.fromName,
               apiKey: creds.apiKey,
