@@ -453,14 +453,27 @@ export const emailService = {
             continue;
           }
 
+          // Resolve content: if step has a templateId, use the latest template content (so editing the template propagates)
+          let stepSubject = currentStep.subject;
+          let stepBodyHtml = currentStep.bodyHtml;
+          let stepBodyText = currentStep.bodyText;
+          if ((currentStep as any).templateId) {
+            const tpl = await prisma.emailTemplate.findUnique({ where: { id: (currentStep as any).templateId } });
+            if (tpl) {
+              stepSubject = tpl.subject;
+              stepBodyHtml = tpl.bodyHtml;
+              stepBodyText = tpl.bodyText;
+            }
+          }
+
           // Replace variables
           const replacements: Record<string, string> = {
             '{nome}': enrollment.contact.nome || '',
             '{email}': enrollment.contact.email || '',
           };
 
-          let subject = currentStep.subject;
-          let bodyHtml = currentStep.bodyHtml;
+          let subject = stepSubject;
+          let bodyHtml = stepBodyHtml;
           for (const [key, val] of Object.entries(replacements)) {
             subject = subject.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), val);
             bodyHtml = bodyHtml.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), val);
