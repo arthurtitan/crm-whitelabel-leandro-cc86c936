@@ -162,7 +162,7 @@ export function CsvImportDialog({ open, onOpenChange, onConfirm }: Props) {
               {parsed.length > 0 && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm">
-                    <CheckCircle2 className="w-4 h-4 text-green-600" />
+                    <CheckCircle2 className="w-4 h-4 text-primary" />
                     <span><strong>{valid.length}</strong> válidos</span>
                     {invalid.length > 0 && (
                       <>
@@ -187,7 +187,7 @@ export function CsvImportDialog({ open, onOpenChange, onConfirm }: Props) {
                             <td className="px-3 py-1.5 font-mono">{p.telefone}</td>
                             <td className="px-3 py-1.5">
                               {p.valid ? (
-                                <Badge variant="outline" className="text-green-700 border-green-300">OK</Badge>
+                                <Badge variant="outline">OK</Badge>
                               ) : (
                                 <Badge variant="destructive" className="text-[10px]">{p.reason}</Badge>
                               )}
