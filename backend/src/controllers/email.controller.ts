@@ -15,6 +15,46 @@ function getUserId(req: Request): string {
   return (req as any).user?.id;
 }
 
+/**
+ * Log a test-send to email_sends so it appears in metrics.
+ * Best-effort: never throws.
+ */
+async function logTestSend(
+  accountId: string,
+  toEmail: string,
+  subject: string,
+  result: { success: boolean; messageId?: string; error?: string },
+) {
+  if (!accountId || !toEmail) return;
+  try {
+    // Find or create a placeholder contact for the test recipient
+    let contact = await prisma.contact.findFirst({
+      where: { accountId, email: { equals: toEmail, mode: 'insensitive' } },
+      select: { id: true },
+    });
+    if (!contact) {
+      contact = await prisma.contact.create({
+        data: { accountId, email: toEmail, nome: toEmail.split('@')[0] || 'Teste' },
+        select: { id: true },
+      });
+    }
+    await prisma.emailSend.create({
+      data: {
+        accountId,
+        contactId: contact.id,
+        toEmail,
+        subject,
+        status: result.success ? 'sent' : 'failed',
+        sentAt: result.success ? new Date() : null,
+        sendgridMessageId: result.messageId || null,
+        errorMessage: result.success ? null : (result.error || null),
+      },
+    });
+  } catch (err: any) {
+    logger.warn(`[testSendEmail] Could not log to email_sends: ${err.message}`);
+  }
+}
+
 export const emailController = {
   // ==================== CADENCES ====================
 

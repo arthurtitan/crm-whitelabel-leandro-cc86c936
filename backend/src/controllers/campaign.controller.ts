@@ -70,4 +70,14 @@ export const campaignController = {
       res.json(data);
     } catch (error) { next(error); }
   },
+
+  async dispatchNow(req: Request, res: Response, next: NextFunction) {
+    try {
+      const cadenceId = (req.body?.cadenceId || undefined) as string | undefined;
+      const data = await campaignService.dispatchNow(req.params.id as string, getAccountId(req), cadenceId);
+      res.json(data);
+    } catch (error: any) {
+      res.status(400).json({ error: error?.message || 'Erro ao disparar campanha' });
+    }
+  },
 };
