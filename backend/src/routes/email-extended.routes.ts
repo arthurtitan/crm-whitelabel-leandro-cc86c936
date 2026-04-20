@@ -21,6 +21,7 @@ router.delete('/campaigns/:id', requirePermission('emails'), (req, res, next) =>
 router.post('/campaigns/:id/cadences', requirePermission('emails'), (req, res, next) => campaignController.addCadence(req, res, next));
 router.delete('/campaigns/:id/cadences', requirePermission('emails'), (req, res, next) => campaignController.removeCadence(req, res, next));
 router.get('/campaigns/:id/stats', requirePermission('emails'), (req, res, next) => campaignController.getStats(req, res, next));
+router.post('/campaigns/:id/dispatch-now', requirePermission('emails'), (req, res, next) => campaignController.dispatchNow(req, res, next));
 
 // Inbox
 router.get('/inbox', requirePermission('emails'), (req, res, next) => inboxController.listMessages(req, res, next));

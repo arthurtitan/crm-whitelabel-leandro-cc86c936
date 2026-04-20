@@ -15,6 +15,46 @@ function getUserId(req: Request): string {
   return (req as any).user?.id;
 }
 
+/**
+ * Log a test-send to email_sends so it appears in metrics.
+ * Best-effort: never throws.
+ */
+async function logTestSend(
+  accountId: string,
+  toEmail: string,
+  subject: string,
+  result: { success: boolean; messageId?: string; error?: string },
+) {
+  if (!accountId || !toEmail) return;
+  try {
+    // Find or create a placeholder contact for the test recipient
+    let contact = await prisma.contact.findFirst({
+      where: { accountId, email: { equals: toEmail, mode: 'insensitive' } },
+      select: { id: true },
+    });
+    if (!contact) {
+      contact = await prisma.contact.create({
+        data: { accountId, email: toEmail, nome: toEmail.split('@')[0] || 'Teste' },
+        select: { id: true },
+      });
+    }
+    await prisma.emailSend.create({
+      data: {
+        accountId,
+        contactId: contact.id,
+        toEmail,
+        subject,
+        status: result.success ? 'sent' : 'failed',
+        sentAt: result.success ? new Date() : null,
+        sendgridMessageId: result.messageId || null,
+        errorMessage: result.success ? null : (result.error || null),
+      },
+    });
+  } catch (err: any) {
+    logger.warn(`[testSendEmail] Could not log to email_sends: ${err.message}`);
+  }
+}
+
 export const emailController = {
   // ==================== CADENCES ====================
 
@@ -304,10 +344,10 @@ export const emailController = {
       let apiKey = req.body.apiKey;
       let fromEmail = req.body.fromEmail;
       let fromName = req.body.fromName || 'GoodLeads CRM';
+      const accountId = getAccountId(req);
 
       // If using existing credentials from account
       if (apiKey === '__existing__') {
-        const accountId = getAccountId(req);
         const creds = await sendgridService.getAccountCredentials(accountId);
         if (!creds) {
           return res.json({ success: false, error: 'Credenciais SendGrid não configuradas na conta.' });
@@ -317,17 +357,21 @@ export const emailController = {
         fromName = fromName || creds.fromName;
       }
 
+      const subject = req.body.subject || 'Teste de E-mail - GoodLeads CRM';
+      const toEmail = req.body.toEmail;
+
       // If custom HTML body is provided, send that instead of the default test template
       if (req.body.html) {
         const result = await sendgridService.sendEmail({
-          to: req.body.toEmail,
-          subject: req.body.subject || 'Teste de E-mail - GoodLeads CRM',
+          to: toEmail,
+          subject,
           html: req.body.html,
           text: req.body.text || undefined,
           fromEmail,
           fromName,
           apiKey,
         });
+        await logTestSend(accountId, toEmail, subject, result);
         return res.json(result);
       }
 
@@ -335,8 +379,9 @@ export const emailController = {
         apiKey,
         fromEmail,
         fromName,
-        req.body.toEmail,
+        toEmail,
       );
+      await logTestSend(accountId, toEmail, 'Teste de Conexão - GoodLeads CRM', result);
       res.json(result);
     } catch (error) { next(error); }
   },

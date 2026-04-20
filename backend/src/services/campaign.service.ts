@@ -163,4 +163,85 @@ export const campaignService = {
 
     return { total, sent, delivered, opened, clicked, bounced, failed, enrollments };
   },
+
+  /**
+   * Dispatch the campaign immediately:
+   * 1) Pick the cadence (provided or first linked one).
+   * 2) Enroll all contacts from the campaign's audience that aren't already enrolled.
+   *    Each new enrollment is set with nextSendAt = now so the processor sends Step 1 immediately.
+   * 3) Process the queue right away.
+   */
+  async dispatchNow(campaignId: string, accountId: string, cadenceId?: string) {
+    await ensureCampaignBelongsToAccount(campaignId, accountId);
+
+    const campaign = await prisma.emailCampaign.findFirst({
+      where: { id: campaignId, accountId },
+      include: {
+        cadences: { include: { steps: { orderBy: { ordem: 'asc' } } } },
+      },
+    });
+    if (!campaign) throw new Error('Campanha não encontrada');
+    if (!campaign.audienceId) throw new Error('Vincule um público à campanha antes de disparar');
+
+    const cadences = campaign.cadences || [];
+    if (cadences.length === 0) throw new Error('Crie ao menos uma cadência nesta campanha');
+
+    const cadence = cadenceId
+      ? cadences.find(c => c.id === cadenceId)
+      : cadences[0];
+    if (!cadence) throw new Error('Cadência não encontrada nesta campanha');
+    if (!cadence.steps.length) throw new Error('A cadência selecionada não possui steps');
+
+    // Load audience contacts with email
+    const audienceLinks = await prisma.emailAudienceContact.findMany({
+      where: { audienceId: campaign.audienceId },
+      include: { contact: { select: { id: true, email: true } } },
+    });
+    const eligibleContactIds = audienceLinks
+      .filter(l => !!l.contact?.email)
+      .map(l => l.contactId);
+
+    if (eligibleContactIds.length === 0) {
+      throw new Error('Nenhum contato com e-mail no público vinculado');
+    }
+
+    // Skip contacts already enrolled (active/paused) in this cadence
+    const existing = await prisma.emailEnrollment.findMany({
+      where: {
+        cadenceId: cadence.id,
+        contactId: { in: eligibleContactIds },
+        status: { in: ['active', 'paused'] },
+      },
+      select: { contactId: true },
+    });
+    const skip = new Set(existing.map(e => e.contactId));
+    const toEnroll = eligibleContactIds.filter(id => !skip.has(id));
+
+    const now = new Date();
+    if (toEnroll.length > 0) {
+      await prisma.emailEnrollment.createMany({
+        data: toEnroll.map(contactId => ({
+          accountId,
+          cadenceId: cadence.id,
+          contactId,
+          currentStep: 0,
+          status: 'active' as const,
+          enrolledAt: now,
+          nextSendAt: now, // send immediately
+        })),
+      });
+    }
+
+    // Trigger immediate processing
+    const { emailService } = await import('./email.service');
+    const processed = await emailService.processCadenceQueue();
+
+    return {
+      enrolled: toEnroll.length,
+      skipped: skip.size,
+      processed,
+      cadenceId: cadence.id,
+      cadenceName: cadence.name,
+    };
+  },
 };

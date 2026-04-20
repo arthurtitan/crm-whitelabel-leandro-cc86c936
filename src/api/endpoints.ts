@@ -205,6 +205,7 @@ export const API_ENDPOINTS = {
     CAMPAIGN: (id: string) => `/api/email/campaigns/${id}`,
     CAMPAIGN_CADENCES: (id: string) => `/api/email/campaigns/${id}/cadences`,
     CAMPAIGN_STATS: (id: string) => `/api/email/campaigns/${id}/stats`,
+    CAMPAIGN_DISPATCH_NOW: (id: string) => `/api/email/campaigns/${id}/dispatch-now`,
     // Audiences
     AUDIENCES: '/api/email/audiences',
     AUDIENCE: (id: string) => `/api/email/audiences/${id}`,

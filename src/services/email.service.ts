@@ -433,6 +433,11 @@ export const emailApiService = {
     return unwrap(res);
   },
 
+  async dispatchCampaignNow(campaignId: string, cadenceId?: string): Promise<{ enrolled: number; skipped: number; processed: number; cadenceId: string; cadenceName: string }> {
+    const res = await apiClient.post<any>(API_ENDPOINTS.EMAIL.CAMPAIGN_DISPATCH_NOW(campaignId), cadenceId ? { cadenceId } : {});
+    return unwrap(res);
+  },
+
   // Inbox
   async listInboxMessages(filters?: { read?: boolean; limit?: number }): Promise<EmailInboxMessage[]> {
     const res = await apiClient.get<any>(API_ENDPOINTS.EMAIL.INBOX, { params: filters });
