@@ -968,6 +968,27 @@ export default function EmailCampaignsTab() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Dispatch Now confirmation */}
+      <AlertDialog open={showDispatchConfirm} onOpenChange={setShowDispatchConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disparar campanha agora?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Todos os contatos do público <strong>{selectedCampaign?.audience?.name}</strong>
+              {selectedCampaign?.audience?.contact_count != null && ` (${selectedCampaign.audience.contact_count} contatos)`} serão inscritos na cadência <strong>{selectedCadence?.name || selectedCampaign?.linkedCadences?.[0]?.name}</strong> e o <strong>Step 1</strong> será enviado imediatamente.
+              <br /><br />
+              Contatos já inscritos serão ignorados. Os envios contam nas métricas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDispatchNow}>
+              <Zap className="w-4 h-4 mr-1" /> Disparar agora
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Quick template editor (opened from a step) */}
       <Dialog open={!!editingTemplate} onOpenChange={(open) => !open && setEditingTemplate(null)}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
