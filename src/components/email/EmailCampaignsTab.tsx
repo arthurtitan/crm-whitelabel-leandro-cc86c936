@@ -94,6 +94,11 @@ export default function EmailCampaignsTab() {
 
   // Templates
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+
+  // Dispatch-now state
+  const [dispatching, setDispatching] = useState(false);
+  const [showDispatchConfirm, setShowDispatchConfirm] = useState(false);
+
   const SELECTED_CAMPAIGN_KEY = accountId ? `email:selectedCampaignId:${accountId}` : '';
   const SELECTED_CADENCE_KEY = accountId ? `email:selectedCadenceId:${accountId}` : '';
 
@@ -335,6 +340,28 @@ export default function EmailCampaignsTab() {
     }
   };
 
+  // ==================== DISPATCH NOW ====================
+  const handleDispatchNow = async () => {
+    if (!selectedCampaign) return;
+    setShowDispatchConfirm(false);
+    setDispatching(true);
+    try {
+      const cadenceId = selectedCadence?.id || selectedCampaign.linkedCadences?.[0]?.id;
+      const result = await (emailService as any).dispatchCampaignNow(selectedCampaign.id, cadenceId);
+      toast.success(
+        `Disparo iniciado: ${result.enrolled} novo(s) inscrito(s)` +
+        (result.skipped ? `, ${result.skipped} já estavam inscritos` : '') +
+        ` • ${result.processed} e-mail(s) processados agora`,
+        { duration: 6000 },
+      );
+      await loadData();
+    } catch (err: any) {
+      toast.error(err?.message || 'Erro ao disparar campanha');
+    } finally {
+      setDispatching(false);
+    }
+  };
+
   const openTemplateQuickEdit = (templateId: string) => {
     const t = templates.find(t => t.id === templateId);
     if (!t) return toast.error('Template não encontrado');
@@ -471,6 +498,22 @@ export default function EmailCampaignsTab() {
           {selectedCampaign.description && <p className="text-sm text-muted-foreground">{selectedCampaign.description}</p>}
         </div>
         <div className="flex items-center gap-1">
+          <Button
+            size="sm"
+            onClick={() => setShowDispatchConfirm(true)}
+            disabled={dispatching || !selectedCampaign.audience || !(selectedCampaign.linkedCadences?.length)}
+            className="gap-1.5"
+            title={
+              !selectedCampaign.audience
+                ? 'Vincule um público à campanha'
+                : !selectedCampaign.linkedCadences?.length
+                ? 'Crie ao menos uma cadência'
+                : 'Inscreve o público e dispara o Step 1 imediatamente'
+            }
+          >
+            {dispatching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+            Disparar agora
+          </Button>
           <Button variant="ghost" size="sm" onClick={() => {
             setEditingCampaign(selectedCampaign);
             setForm({ name: selectedCampaign.name, description: selectedCampaign.description || '', audienceId: (selectedCampaign as any).audience_id || '' });
