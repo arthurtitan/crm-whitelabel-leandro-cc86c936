@@ -6,7 +6,6 @@ const prisma = new PrismaClient();
 interface GenerateEmailParams {
   accountId: string;
   prompt: string;
-  agentId?: string;
   context?: {
     leadName?: string;
     leadEmail?: string;
@@ -27,7 +26,7 @@ export const emailAiService = {
    * Generate an email message using OpenAI
    */
   async generateEmail(params: GenerateEmailParams): Promise<GeneratedEmail> {
-    const { accountId, prompt, agentId, context } = params;
+    const { accountId, prompt, context } = params;
 
     // Get OpenAI API key from account
     const account = await prisma.account.findUnique({
@@ -39,7 +38,7 @@ export const emailAiService = {
       throw new Error('Chave da OpenAI não configurada para esta conta.');
     }
 
-    let systemPrompt = `Você é um assistente especializado em criar e-mails de prospecção e vendas para o CRM GoodLeads.
+    const systemPrompt = `Você é um assistente especializado em criar e-mails de prospecção e vendas para o CRM GoodLeads.
 Empresa: ${account.nome}
 
 Regras:
@@ -50,20 +49,6 @@ Regras:
 - O HTML deve ser simples e compatível com e-mail (inline styles)
 - Não use imagens externas
 - Mantenha o texto conciso e direto`;
-
-    let model = 'gpt-4o-mini';
-    let temperature = 0.7;
-
-    if (agentId) {
-      const agent = await prisma.aiAgent.findFirst({
-        where: { id: agentId, accountId, isActive: true },
-      });
-      if (agent) {
-        systemPrompt = `${agent.systemPrompt}\n\n${systemPrompt}`;
-        model = agent.model;
-        temperature = agent.temperature;
-      }
-    }
 
     let userPrompt = prompt;
     if (context) {
@@ -87,12 +72,12 @@ Regras:
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: model,
+          model: 'gpt-4o-mini',
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt },
           ],
-          temperature: temperature,
+          temperature: 0.7,
           response_format: { type: 'json_object' },
         }),
       });
