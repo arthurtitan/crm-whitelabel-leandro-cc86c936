@@ -265,7 +265,7 @@ export const emailCloudService = {
   },
 
   // ==================== AI (placeholder - needs backend) ====================
-  async generateEmail(prompt: string, context?: { leadName?: string; leadEmail?: string; stageName?: string; agentId?: string }): Promise<GeneratedEmail> {
+  async generateEmail(prompt: string, context?: { leadName?: string; leadEmail?: string; stageName?: string }): Promise<GeneratedEmail> {
     throw new Error('Geração de IA requer configuração do backend. Configure a chave OpenAI nas configurações da conta.');
   },
 
