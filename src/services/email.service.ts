@@ -343,8 +343,12 @@ export const emailApiService = {
   },
 
   // AI
-  async generateEmail(prompt: string, context?: { leadName?: string; leadEmail?: string; stageName?: string }): Promise<GeneratedEmail> {
-    const res = await apiClient.post<any>(API_ENDPOINTS.EMAIL.AI_GENERATE, { prompt, context });
+  async generateEmail(prompt: string, context?: { leadName?: string; leadEmail?: string; stageName?: string; agentId?: string }): Promise<GeneratedEmail> {
+    const res = await apiClient.post<any>(API_ENDPOINTS.EMAIL.AI_GENERATE, { 
+      prompt, 
+      context,
+      agentId: context?.agentId 
+    });
     return unwrap<GeneratedEmail>(res);
   },
 

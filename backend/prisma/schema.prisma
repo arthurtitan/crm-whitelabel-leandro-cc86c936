@@ -1,3 +1,31 @@
+ // ============================================
+ // AI AGENTS
+ // ============================================
+ model AiAgent {
+   id            String   @id @default(uuid()) @db.Uuid
+   accountId     String   @map("account_id") @db.Uuid
+   name          String   @db.VarChar(255)
+   role          AgentRole
+   systemPrompt  String   @map("system_prompt") @db.Text
+   model         String   @default("gpt-4o-mini") @db.VarChar(100)
+   temperature   Float    @default(0.7)
+   isActive      Boolean  @default(true) @map("is_active")
+   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+   updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+   account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+   @@index([accountId])
+   @@map("ai_agents")
+ }
+
+ enum AgentRole {
+   prospecting
+   sales
+   support
+   general
+ }
+
 // GLEPS CRM Database Schema
 // Multi-tenant CRM with Chatwoot integration
 
@@ -63,6 +91,7 @@ model Account {
   emailInboxMessages  EmailInboxMessage[]
   emailAudiences      EmailAudience[]
   prospectingAudiences ProspectingAudience[]
+  aiAgents            AiAgent[]
 
   @@index([status])
   @@map("accounts")
