@@ -91,6 +91,7 @@ model Account {
   emailInboxMessages  EmailInboxMessage[]
   emailAudiences      EmailAudience[]
   prospectingAudiences ProspectingAudience[]
+  aiAgents            AiAgent[]
 
   @@index([status])
   @@map("accounts")
