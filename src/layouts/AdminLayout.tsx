@@ -32,7 +32,6 @@ import {
   Lightbulb,
   Crosshair,
   Mail,
-  Bot,
 } from 'lucide-react';
 import mychooiceLogo from '@/assets/mychooice-logo-white.svg';
 
@@ -51,7 +50,6 @@ const adminNavItems = [
   { title: 'Insights', href: '/admin/insights', icon: Lightbulb },
   { title: 'Prospecção', href: '/admin/prospeccao', icon: Crosshair },
   { title: 'E-mails', href: '/admin/emails', icon: Mail },
-  { title: 'Agentes IA', href: '/admin/agents', icon: Bot },
 ];
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
