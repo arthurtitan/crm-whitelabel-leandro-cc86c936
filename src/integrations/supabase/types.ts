@@ -86,53 +86,6 @@ export type Database = {
         }
         Relationships: []
       }
-      ai_agents: {
-        Row: {
-          account_id: string
-          created_at: string
-          id: string
-          is_active: boolean
-          model: string
-          name: string
-          role: string
-          system_prompt: string
-          temperature: number
-          updated_at: string
-        }
-        Insert: {
-          account_id: string
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          model?: string
-          name: string
-          role: string
-          system_prompt: string
-          temperature?: number
-          updated_at?: string
-        }
-        Update: {
-          account_id?: string
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          model?: string
-          name?: string
-          role?: string
-          system_prompt?: string
-          temperature?: number
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "ai_agents_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       api_usage_logs: {
         Row: {
           account_id: string
