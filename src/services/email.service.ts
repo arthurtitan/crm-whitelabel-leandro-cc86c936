@@ -142,6 +142,16 @@ export interface EmailInboxMessage {
   contact?: { id: string; nome?: string; email?: string };
 }
 
+export interface InboxDiagnostics {
+  webhookUrl: string;
+  totalMessages: number;
+  unreadMessages: number;
+  latestReceivedAt: string | null;
+  latestFromEmail: string | null;
+  sendgridConfigured: boolean;
+  sendgridFromEmail: string | null;
+}
+
 export interface EmailSearchResult {
   contact: any | null;
   enrollments: any[];
@@ -466,6 +476,27 @@ export const emailApiService = {
   async suggestReply(messageId: string, instructions?: string): Promise<GeneratedEmail> {
     const res = await apiClient.post<any>(API_ENDPOINTS.EMAIL.INBOX_SUGGEST_REPLY, { messageId, instructions });
     return unwrap(res);
+  },
+
+  async getInboxDiagnostics(): Promise<InboxDiagnostics> {
+    const res = await apiClient.get<any>(API_ENDPOINTS.EMAIL.INBOX_DIAGNOSTICS);
+    return unwrap(res);
+  },
+
+  async markInboxRepliedManually(id: string): Promise<void> {
+    await apiClient.put(API_ENDPOINTS.EMAIL.INBOX_MARK_REPLIED(id));
+  },
+
+  async pauseEnrollmentFromInbox(id: string): Promise<void> {
+    await apiClient.post(API_ENDPOINTS.EMAIL.INBOX_PAUSE_ENROLLMENT(id), {});
+  },
+
+  async resumeEnrollmentFromInbox(id: string): Promise<void> {
+    await apiClient.post(API_ENDPOINTS.EMAIL.INBOX_RESUME_ENROLLMENT(id), {});
+  },
+
+  async unenrollFromInbox(id: string): Promise<void> {
+    await apiClient.post(API_ENDPOINTS.EMAIL.INBOX_UNENROLL(id), {});
   },
 
   // Search
