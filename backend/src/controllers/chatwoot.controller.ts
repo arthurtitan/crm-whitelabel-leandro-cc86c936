@@ -646,6 +646,30 @@ async function handleConversationUpdated(accountId: string, event: ChatwootWebho
 async function handleStatusChanged(accountId: string, event: ChatwootWebhookEvent) {
   if (!event.conversation) return;
 
+  const newStatus = event.conversation.status;
+  const previousStatus = event.changed_attributes?.[0]?.previous_value;
+
+  // Logic to clear 'resolved_by' on conversation reopen (from resolved -> open)
+  // This ensures the next resolution cycle starts with a fresh marker.
+  if (newStatus === 'open' && previousStatus === 'resolved') {
+    try {
+      await chatwootService.updateConversationCustomAttributes(
+        accountId,
+        event.conversation.id,
+        { resolved_by: null }
+      );
+      logger.info('Cleared resolved_by marker on conversation reopen', {
+        conversationId: event.conversation.id,
+        accountId,
+      });
+    } catch (error) {
+      logger.error('Failed to clear resolved_by marker on reopen', {
+        conversationId: event.conversation.id,
+        error,
+      });
+    }
+  }
+
   // Record event for metrics/dashboard
   await eventService.create({
     eventType: 'chatwoot.conversation.status_changed',
@@ -655,7 +679,7 @@ async function handleStatusChanged(accountId: string, event: ChatwootWebhookEven
     payload: {
       conversationId: event.conversation.id,
       status: event.conversation.status,
-      previousStatus: event.changed_attributes?.[0]?.previous_value,
+      previousStatus,
     },
   });
 }
