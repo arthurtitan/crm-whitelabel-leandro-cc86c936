@@ -86,6 +86,87 @@ class ChatwootController {
     }
   }
 
+  /**
+   * POST /api/chatwoot/log-resolution
+   * Public endpoint to log a conversation resolution from external automation (n8n).
+   * Optional shared-secret protection via header `x-webhook-secret` (env CHATWOOT_WEBHOOK_SECRET).
+   *
+   * Body: {
+   *   chatwoot_account_id: string|number,  // Chatwoot account id (not internal UUID)
+   *   conversation_id: number,
+   *   resolved_by: 'ai' | 'human',
+   *   resolution_type?: 'explicit' | 'inferred',
+   *   ai_participated?: boolean,
+   *   agent_id?: number | null
+   * }
+   * Idempotent: ON CONFLICT (account_id, conversation_id) DO NOTHING.
+   */
+  async logResolution(req: Request, res: Response, _next: NextFunction) {
+    try {
+      // Optional shared secret (header). Allows the webhook handler to stay open
+      // for Chatwoot signature flow while we add a lightweight check for n8n.
+      if (env.CHATWOOT_WEBHOOK_SECRET) {
+        const provided = req.header('x-webhook-secret');
+        if (provided && provided !== env.CHATWOOT_WEBHOOK_SECRET) {
+          logger.warn('[log-resolution] Invalid x-webhook-secret');
+          return res.status(401).json({ error: 'Invalid secret' });
+        }
+      }
+
+      const {
+        chatwoot_account_id,
+        conversation_id,
+        resolved_by,
+        resolution_type = 'explicit',
+        ai_participated = false,
+        agent_id = null,
+      } = req.body || {};
+
+      if (!chatwoot_account_id || !conversation_id || !resolved_by) {
+        return res.status(400).json({
+          error: 'chatwoot_account_id, conversation_id and resolved_by are required',
+        });
+      }
+
+      if (resolved_by !== 'ai' && resolved_by !== 'human') {
+        return res.status(400).json({ error: "resolved_by must be 'ai' or 'human'" });
+      }
+
+      // Map Chatwoot account id -> internal account UUID
+      const account = await prisma.account.findFirst({
+        where: { chatwootAccountId: String(chatwoot_account_id) },
+        select: { id: true },
+      });
+
+      if (!account) {
+        logger.warn('[log-resolution] Unknown Chatwoot account', { chatwoot_account_id });
+        return res.status(404).json({ error: 'Unknown Chatwoot account' });
+      }
+
+      // Idempotent insert via unique (account_id, conversation_id)
+      await prisma.$executeRaw`
+        INSERT INTO resolution_logs
+          (account_id, conversation_id, resolved_by, resolution_type, ai_participated, agent_id, resolved_at)
+        VALUES
+          (${account.id}::uuid, ${Number(conversation_id)}, ${resolved_by}, ${resolution_type},
+           ${Boolean(ai_participated)}, ${agent_id ? Number(agent_id) : null}, NOW())
+        ON CONFLICT (account_id, conversation_id) DO NOTHING
+      `;
+
+      logger.info('[log-resolution] Logged', {
+        account_id: account.id,
+        conversation_id,
+        resolved_by,
+        ai_participated,
+      });
+
+      return res.json({ ok: true });
+    } catch (error: any) {
+      logger.error('[log-resolution] Error', { message: error?.message });
+      return res.status(500).json({ error: 'Internal error' });
+    }
+  }
+
   // ============================================
   // API Endpoints (Authenticated)
   // ============================================
