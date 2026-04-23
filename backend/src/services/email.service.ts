@@ -364,17 +364,22 @@ export const emailService = {
   },
 
   async getSendStats(accountId: string) {
-    const [total, sent, delivered, opened, clicked, bounced, failed] = await Promise.all([
-      prisma.emailSend.count({ where: { accountId } }),
-      prisma.emailSend.count({ where: { accountId, status: 'sent' } }),
-      prisma.emailSend.count({ where: { accountId, status: 'delivered' } }),
-      prisma.emailSend.count({ where: { accountId, status: 'opened' } }),
-      prisma.emailSend.count({ where: { accountId, status: 'clicked' } }),
-      prisma.emailSend.count({ where: { accountId, status: 'bounced' } }),
-      prisma.emailSend.count({ where: { accountId, status: 'failed' } }),
-    ]);
-
-    return { total, sent, delivered, opened, clicked, bounced, failed };
+   const [total, sentOnly, deliveredOnly, openedOnly, clickedOnly, bounced, failed] = await Promise.all([
+     prisma.emailSend.count({ where: { accountId } }),
+     prisma.emailSend.count({ where: { accountId, status: 'sent' } }),
+     prisma.emailSend.count({ where: { accountId, status: 'delivered' } }),
+     prisma.emailSend.count({ where: { accountId, status: 'opened' } }),
+     prisma.emailSend.count({ where: { accountId, status: 'clicked' } }),
+     prisma.emailSend.count({ where: { accountId, status: 'bounced' } }),
+     prisma.emailSend.count({ where: { accountId, status: 'failed' } }),
+   ]);
+ 
+   // Cumulative metrics: Sent includes anything that reached the destination or beyond
+   const opened = openedOnly + clickedOnly;
+   const delivered = deliveredOnly + opened;
+   const sent = sentOnly + delivered;
+ 
+   return { total, sent, delivered, opened, clicked: clickedOnly, bounced, failed };
   },
 
   // ==================== CADENCE PROCESSOR (with rate limiting) ====================
@@ -576,7 +581,7 @@ export const emailService = {
         },
       });
 
-      if (!send?.enrollment?.cadence?.rulesFrom?.length) return;
+       if (!send?.enrollment || send.enrollment.status !== 'active' || !send.enrollment.cadence?.rulesFrom?.length) return;
 
       const matchingRule = send.enrollment.cadence.rulesFrom.find(
         r => r.triggerEvent === triggerEvent
@@ -624,24 +629,14 @@ export const emailService = {
       },
     });
 
-    let nextSendAt: Date;
-    if (rule.delayHours > 0) {
-      // Apply delay_hours from now
-      nextSendAt = new Date(Date.now() + rule.delayHours * 60 * 60 * 1000);
-    } else if (targetCadence?.steps[0]) {
-      // No delay: schedule based on target cadence's first step timing
-      const timezone = targetCadence.account?.timezone || 'America/Sao_Paulo';
-      nextSendAt = calculateNextSendAt(
-        targetCadence.steps[0].dayNumber,
-        targetCadence.sendAtTime,
-        timezone,
-        targetCadence.startDate
-      );
-      // If calculated time is in the past, send now
-      if (nextSendAt < new Date()) nextSendAt = new Date();
-    } else {
-      nextSendAt = new Date();
-    }
+     let nextSendAt: Date;
+     if (rule.delayHours > 0) {
+       // Apply delay_hours from now
+       nextSendAt = new Date(Date.now() + rule.delayHours * 60 * 60 * 1000);
+     } else {
+       // Immediate move: set nextSendAt to now so it's picked up in the next cron cycle (or right away)
+       nextSendAt = new Date();
+     }
 
     await prisma.emailEnrollment.create({
       data: {

@@ -150,18 +150,23 @@ export const campaignService = {
     const cadenceIds = cadences.map(c => c.id);
     if (cadenceIds.length === 0) return { total: 0, sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, failed: 0, enrollments: 0 };
 
-    const [total, sent, delivered, opened, clicked, bounced, failed, enrollments] = await Promise.all([
-      prisma.emailSend.count({ where: { enrollment: { cadenceId: { in: cadenceIds } } } }),
-      prisma.emailSend.count({ where: { enrollment: { cadenceId: { in: cadenceIds } }, status: 'sent' } }),
-      prisma.emailSend.count({ where: { enrollment: { cadenceId: { in: cadenceIds } }, status: 'delivered' } }),
-      prisma.emailSend.count({ where: { enrollment: { cadenceId: { in: cadenceIds } }, status: 'opened' } }),
-      prisma.emailSend.count({ where: { enrollment: { cadenceId: { in: cadenceIds } }, status: 'clicked' } }),
-      prisma.emailSend.count({ where: { enrollment: { cadenceId: { in: cadenceIds } }, status: 'bounced' } }),
-      prisma.emailSend.count({ where: { enrollment: { cadenceId: { in: cadenceIds } }, status: 'failed' } }),
-      prisma.emailEnrollment.count({ where: { cadenceId: { in: cadenceIds } } }),
-    ]);
-
-    return { total, sent, delivered, opened, clicked, bounced, failed, enrollments };
+     const [total, sentOnly, deliveredOnly, openedOnly, clickedOnly, bounced, failed, enrollments] = await Promise.all([
+       prisma.emailSend.count({ where: { enrollment: { cadenceId: { in: cadenceIds } } } }),
+       prisma.emailSend.count({ where: { enrollment: { cadenceId: { in: cadenceIds } }, status: 'sent' } }),
+       prisma.emailSend.count({ where: { enrollment: { cadenceId: { in: cadenceIds } }, status: 'delivered' } }),
+       prisma.emailSend.count({ where: { enrollment: { cadenceId: { in: cadenceIds } }, status: 'opened' } }),
+       prisma.emailSend.count({ where: { enrollment: { cadenceId: { in: cadenceIds } }, status: 'clicked' } }),
+       prisma.emailSend.count({ where: { enrollment: { cadenceId: { in: cadenceIds } }, status: 'bounced' } }),
+       prisma.emailSend.count({ where: { enrollment: { cadenceId: { in: cadenceIds } }, status: 'failed' } }),
+       prisma.emailEnrollment.count({ where: { cadenceId: { in: cadenceIds } } }),
+     ]);
+ 
+     // Cumulative metrics: Sent includes anything that reached the destination or beyond
+     const opened = openedOnly + clickedOnly;
+     const delivered = deliveredOnly + opened;
+     const sent = sentOnly + delivered;
+ 
+     return { total, sent, delivered, opened, clicked: clickedOnly, bounced, failed, enrollments };
   },
 
   /**
