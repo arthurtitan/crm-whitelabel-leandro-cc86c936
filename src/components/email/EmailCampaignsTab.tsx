@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useContext, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -58,6 +59,7 @@ interface CampaignFull extends EmailCampaign {
 export default function EmailCampaignsTab() {
   const auth = useContext(AuthContext);
   const accountId = auth?.account?.id || auth?.user?.account_id || '';
+  const [searchParams, setSearchParams] = useSearchParams();
   const [campaigns, setCampaigns] = useState<CampaignFull[]>([]);
   const [audiences, setAudiences] = useState<Audience[]>([]);
   const [loading, setLoading] = useState(true);
@@ -99,35 +101,26 @@ export default function EmailCampaignsTab() {
   const [dispatching, setDispatching] = useState(false);
   const [showDispatchConfirm, setShowDispatchConfirm] = useState(false);
 
-  const SELECTED_CAMPAIGN_KEY = accountId ? `email:selectedCampaignId:${accountId}` : '';
-  const SELECTED_CADENCE_KEY = accountId ? `email:selectedCadenceId:${accountId}` : '';
+  // Refs mirror URL params so loadData (which only depends on accountId)
+  // can read the current selection without re-running on every selection change.
+  const selectedCampaignIdRef = useRef<string | null>(searchParams.get('campaign'));
+  const selectedCadenceIdRef = useRef<string | null>(searchParams.get('cadence'));
 
-  const selectedCampaignIdRef = useRef<string | null>(
-    typeof window !== 'undefined' && SELECTED_CAMPAIGN_KEY
-      ? sessionStorage.getItem(SELECTED_CAMPAIGN_KEY)
-      : null
-  );
-  const selectedCadenceIdRef = useRef<string | null>(
-    typeof window !== 'undefined' && SELECTED_CADENCE_KEY
-      ? sessionStorage.getItem(SELECTED_CADENCE_KEY)
-      : null
-  );
+  // Sync URL → refs and component state when user selects a campaign/cadence
+  const updateUrlSelection = useCallback((campaignId: string | null, cadenceId: string | null) => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      if (campaignId) next.set('campaign', campaignId); else next.delete('campaign');
+      if (cadenceId) next.set('cadence', cadenceId); else next.delete('cadence');
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
 
   useEffect(() => {
     selectedCampaignIdRef.current = selectedCampaign?.id || null;
-    if (SELECTED_CAMPAIGN_KEY) {
-      if (selectedCampaign?.id) sessionStorage.setItem(SELECTED_CAMPAIGN_KEY, selectedCampaign.id);
-      else sessionStorage.removeItem(SELECTED_CAMPAIGN_KEY);
-    }
-  }, [selectedCampaign, SELECTED_CAMPAIGN_KEY]);
-
-  useEffect(() => {
     selectedCadenceIdRef.current = selectedCadence?.id || null;
-    if (SELECTED_CADENCE_KEY) {
-      if (selectedCadence?.id) sessionStorage.setItem(SELECTED_CADENCE_KEY, selectedCadence.id);
-      else sessionStorage.removeItem(SELECTED_CADENCE_KEY);
-    }
-  }, [selectedCadence, SELECTED_CADENCE_KEY]);
+    updateUrlSelection(selectedCampaign?.id || null, selectedCadence?.id || null);
+  }, [selectedCampaign, selectedCadence, updateUrlSelection]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
