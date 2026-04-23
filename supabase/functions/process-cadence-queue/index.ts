@@ -18,18 +18,17 @@ Deno.serve(async (req) => {
 
   try {
     // Get backend URL from env or use default
-    const backendUrl = Deno.env.get('BACKEND_API_URL') || 'https://api.goodleads.com.br';
-    const serviceKey = Deno.env.get('BACKEND_SERVICE_KEY') || '';
-
-    const response = await fetch(`${backendUrl}/api/emails/process`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${serviceKey}`,
-      },
+    const backendUrl = Deno.env.get('BACKEND_API_URL') || 'https://goodleads.mychooice.com';
+    
+    // Health check only - the backend has its own internal cron job (setInterval)
+    // that processes the email cadence queue every 5 minutes.
+    // This edge function exists as a backup ping to ensure the backend is alive.
+    const response = await fetch(`${backendUrl}/api/health`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
     });
 
-    const data = await response.json();
+    const data = await response.json().catch(() => ({}));
 
     return new Response(JSON.stringify({
       success: true,
