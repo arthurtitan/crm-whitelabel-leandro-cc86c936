@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,15 +49,21 @@ export default function LoginPage() {
   
   const { login, user, isAuthenticated, isLoading, authError, clearAuthError } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   
   // Redirect when authenticated with user data
   useEffect(() => {
     if (isAuthenticated && user && !isLoading) {
-      const targetRoute = getSmartDefaultRoute({ role: user.role, permissions: user.permissions });
+      // Check if we have a redirect target in location state
+      const from = (location.state as any)?.from;
+      const targetRoute = from 
+        ? (from.pathname + from.search) 
+        : getSmartDefaultRoute({ role: user.role, permissions: user.permissions });
+      
       console.log('[LoginPage] Authenticated, redirecting to:', targetRoute);
       navigate(targetRoute, { replace: true });
     }
-  }, [isAuthenticated, user, isLoading, navigate]);
+  }, [isAuthenticated, user, isLoading, navigate, location.state]);
 
   // Handle auth errors from context
   useEffect(() => {
