@@ -648,6 +648,8 @@ async function handleStatusChanged(accountId: string, event: ChatwootWebhookEven
 
   const newStatus = event.conversation.status;
   const previousStatus = event.changed_attributes?.[0]?.previous_value;
+  const customAttributes = event.conversation.custom_attributes || {};
+  const resolvedBy = customAttributes.resolved_by;
 
   // Logic to clear 'resolved_by' on conversation reopen (from resolved -> open)
   // This ensures the next resolution cycle starts with a fresh marker.
@@ -668,6 +670,28 @@ async function handleStatusChanged(accountId: string, event: ChatwootWebhookEven
         error,
       });
     }
+  }
+
+  // Logic to automatically log resolution when conversation status is changed to resolved
+  // Checks if 'resolved_by' is set in custom_attributes (set by AI or human via Chatwoot UI/API)
+  if (newStatus === 'resolved' && previousStatus !== 'resolved' && resolvedBy) {
+    const resolutionSource = resolvedBy === 'ai' || resolvedBy === 'human' ? resolvedBy : 'human';
+    
+    await chatwootMetricsService.logResolution({
+      accountId,
+      conversationId: event.conversation.id,
+      resolvedBy: resolutionSource as 'ai' | 'human',
+      resolutionType: 'explicit',
+      aiParticipated: customAttributes.ai_responded === true || customAttributes.ai_participated === true,
+      agentId: event.conversation.assignee_id || null,
+      resolvedAt: new Date(),
+    });
+
+    logger.info('Automatically logged resolution from webhook', {
+      conversationId: event.conversation.id,
+      resolvedBy: resolutionSource,
+      accountId,
+    });
   }
 
   // Record event for metrics/dashboard
