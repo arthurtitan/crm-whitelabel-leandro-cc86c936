@@ -215,9 +215,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     mountedRef.current = true;
     console.log('[Auth] Initializing auth system...');
 
-    // Track if initial session has been processed
-    let initialSessionProcessed = false;
-
     const processSession = async (supabaseUser: SupabaseUser, source: string) => {
       if (!mountedRef.current) {
         console.log(`[Auth] (${source}) Component unmounted, skipping`);
@@ -285,34 +282,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           });
           setOriginalUser(null);
           setIsImpersonating(false);
-        } else if (event === 'INITIAL_SESSION' && !session) {
-          console.log('[Auth] No initial session');
-          setAuthState(prev => ({ ...prev, isLoading: false }));
         }
+        // Removing INITIAL_SESSION null check here as it can be premature
+        // We let checkSession be the authority for the absence of a session
       }
     );
 
     // 2. Check for existing session AFTER listener is set up
     const checkSession = async () => {
       console.log('[Auth] Checking existing session...');
-      const { data: { session }, error } = await supabase.auth.getSession();
-      
-      if (error) {
-        console.error('[Auth] getSession error:', error);
-        setAuthState(prev => ({ ...prev, isLoading: false }));
-        initialSessionProcessed = true;
-        return;
-      }
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('[Auth] getSession error:', error);
+          setAuthState(prev => ({ ...prev, isLoading: false }));
+          return;
+        }
 
-      if (session?.user) {
-        console.log('[Auth] Found existing session');
-        await processSession(session.user, 'getSession');
-      } else {
-        console.log('[Auth] No existing session');
+        if (session?.user) {
+          console.log('[Auth] Found existing session, starting hydration...');
+          await processSession(session.user, 'getSession');
+        } else {
+          console.log('[Auth] No session in getSession, finalizing loading');
+          setAuthState(prev => ({ ...prev, isLoading: false }));
+        }
+      } catch (err) {
+        console.error('[Auth] Unexpected error during session check:', err);
         setAuthState(prev => ({ ...prev, isLoading: false }));
       }
-      
-      initialSessionProcessed = true;
     };
 
     checkSession();
