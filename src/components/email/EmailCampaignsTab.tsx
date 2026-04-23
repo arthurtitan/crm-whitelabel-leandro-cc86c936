@@ -394,7 +394,7 @@ export default function EmailCampaignsTab() {
 
   const stats = selectedCampaign?.stats || { total: 0, sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, failed: 0, enrollments: 0 };
   const kpis = [
-    { label: 'Enviados', value: stats.sent + stats.delivered, icon: Send, color: 'text-blue-400' },
+    { label: 'Enviados', value: stats.sent, icon: Send, color: 'text-blue-400' },
     { label: 'Entregues', value: stats.delivered, icon: Mail, color: 'text-emerald-400' },
     { label: 'Abertos', value: stats.opened, icon: Eye, color: 'text-violet-400' },
     { label: 'Clicados', value: stats.clicked, icon: MousePointer, color: 'text-cyan-400' },
