@@ -570,9 +570,9 @@ model ResolutionLog {
   resolvedAt      DateTime @default(now()) @map("resolved_at") @db.Timestamptz
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  @@unique([accountId, conversationId])
   @@index([accountId])
   @@index([resolvedAt])
+  @@index([accountId, conversationId, resolvedAt(sort: Desc)], map: "resolution_logs_account_conversation_idx")
   @@map("resolution_logs")
 }
 
