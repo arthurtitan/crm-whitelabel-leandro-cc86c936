@@ -92,20 +92,23 @@ export function BackendAuthProvider({ children }: { children: ReactNode }) {
   // Hydrate user from /api/auth/me
   const hydrateFromToken = useCallback(async () => {
     const token = tokenManager.getToken();
+    console.log('[BackendAuth] Hydrating from token:', token ? 'Found' : 'None');
+    
     if (!token) {
-      setAuthState({
-        user: null, account: null, isAuthenticated: false, isLoading: false, authError: null,
-      });
+      console.log('[BackendAuth] No token found, finalizing loading');
+      setAuthState(prev => ({ ...prev, isLoading: false }));
       return;
     }
 
     try {
+      console.log('[BackendAuth] Fetching user info from backend...');
       const raw = await apiClient.get<any>(API_ENDPOINTS.AUTH.ME);
       // Support both { data: { user, account } } and { user, account }
       const response = raw?.data ?? raw;
 
       if (!mountedRef.current) return;
 
+      console.log('[BackendAuth] Hydration successful for:', response.user?.email);
       setAuthState({
         user: normalizeUser(response.user),
         account: normalizeAccount(response.account),
@@ -115,11 +118,20 @@ export function BackendAuthProvider({ children }: { children: ReactNode }) {
       });
     } catch (error: any) {
       console.error('[BackendAuth] Failed to hydrate:', error);
-      tokenManager.clearTokens();
+      
+      // Only clear tokens if we are sure it's an auth failure (401)
+      // Network errors (no status) should NOT clear tokens to allow refresh retry
+      if (error?.status === 401) {
+        console.log('[BackendAuth] Token invalid/expired, clearing tokens');
+        tokenManager.clearTokens();
+      }
+      
       if (mountedRef.current) {
-        setAuthState({
-          user: null, account: null, isAuthenticated: false, isLoading: false, authError: null,
-        });
+        setAuthState(prev => ({ 
+          ...prev, 
+          isLoading: false,
+          isAuthenticated: false, // Ensure we are not authenticated if fetch failed
+        }));
       }
     }
   }, []);
