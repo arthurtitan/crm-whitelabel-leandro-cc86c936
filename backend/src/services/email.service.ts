@@ -581,7 +581,14 @@ export const emailService = {
         },
       });
 
-       if (!send?.enrollment || send.enrollment.status !== 'active' || !send.enrollment.cadence?.rulesFrom?.length) return;
+       // NOTE: We intentionally do NOT require status === 'active' here.
+       // Single-step cadences mark the enrollment as 'completed' as soon as the
+       // only step is sent. The 'opened' / 'clicked' / 'bounced' events naturally
+       // arrive AFTER that completion, so requiring an active enrollment would
+       // make the rule never fire for completed enrollments. Duplicate enrollment
+       // protection is already handled inside applyBranchingRule().
+       if (!send?.enrollment || !send.enrollment.cadence?.rulesFrom?.length) return;
+       if (send.enrollment.status === 'unsubscribed' || send.enrollment.status === 'paused') return;
 
       const matchingRule = send.enrollment.cadence.rulesFrom.find(
         r => r.triggerEvent === triggerEvent
@@ -603,12 +610,15 @@ export const emailService = {
     enrollment: { id: string; contactId: string },
     accountId: string
   ) {
-    // Check if already enrolled in target cadence
+    // Avoid creating a duplicate enrollment if the contact is already running
+    // (or paused, awaiting resume) in the target cadence. Completed/unsubscribed
+    // enrollments do NOT block re-entering — the rule should be able to move
+    // the contact in again on a new event.
     const existing = await prisma.emailEnrollment.findFirst({
       where: {
         cadenceId: rule.targetCadenceId,
         contactId: enrollment.contactId,
-        status: 'active',
+        status: { in: ['active', 'paused'] },
       },
     });
 
