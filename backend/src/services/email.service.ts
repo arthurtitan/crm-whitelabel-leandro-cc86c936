@@ -581,7 +581,7 @@ export const emailService = {
         },
       });
 
-      if (!send?.enrollment?.cadence?.rulesFrom?.length) return;
+       if (!send?.enrollment || send.enrollment.status !== 'active' || !send.enrollment.cadence?.rulesFrom?.length) return;
 
       const matchingRule = send.enrollment.cadence.rulesFrom.find(
         r => r.triggerEvent === triggerEvent
