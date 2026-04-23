@@ -143,17 +143,16 @@ class ChatwootController {
         return res.status(404).json({ error: 'Unknown Chatwoot account' });
       }
 
-      // Allow multiple resolutions per conversation (one row per resolution cycle).
-      // Reopens followed by new closures generate additional rows — n8n is responsible
-      // for clearing custom_attributes.resolved_by on conversation reopen so the next
-      // resolution is attributed correctly (ai vs human).
-      await prisma.$executeRaw`
-        INSERT INTO resolution_logs
-          (account_id, conversation_id, resolved_by, resolution_type, ai_participated, agent_id, resolved_at)
-        VALUES
-          (${account.id}::uuid, ${Number(conversation_id)}, ${resolved_by}, ${resolution_type},
-           ${Boolean(ai_participated)}, ${agent_id ? Number(agent_id) : null}, NOW())
-      `;
+      // Delegate to metrics service for consistent logging
+      await chatwootMetricsService.logResolution({
+        accountId: account.id,
+        conversationId: Number(conversation_id),
+        resolvedBy: resolved_by as 'ai' | 'human',
+        resolutionType: resolution_type,
+        aiParticipated: Boolean(ai_participated),
+        agentId: agent_id ? Number(agent_id) : null,
+        resolvedAt: new Date(),
+      });
 
       logger.info('[log-resolution] Logged', {
         account_id: account.id,
@@ -646,6 +645,54 @@ async function handleConversationUpdated(accountId: string, event: ChatwootWebho
 async function handleStatusChanged(accountId: string, event: ChatwootWebhookEvent) {
   if (!event.conversation) return;
 
+  const newStatus = event.conversation.status;
+  const previousStatus = event.changed_attributes?.[0]?.previous_value;
+  const customAttributes = event.conversation.custom_attributes || {};
+  const resolvedBy = customAttributes.resolved_by;
+
+  // Logic to clear 'resolved_by' on conversation reopen (from resolved -> open)
+  // This ensures the next resolution cycle starts with a fresh marker.
+  if (newStatus === 'open' && previousStatus === 'resolved') {
+    try {
+      await chatwootService.updateConversationCustomAttributes(
+        accountId,
+        event.conversation.id,
+        { resolved_by: null }
+      );
+      logger.info('Cleared resolved_by marker on conversation reopen', {
+        conversationId: event.conversation.id,
+        accountId,
+      });
+    } catch (error) {
+      logger.error('Failed to clear resolved_by marker on reopen', {
+        conversationId: event.conversation.id,
+        error,
+      });
+    }
+  }
+
+  // Logic to automatically log resolution when conversation status is changed to resolved
+  // Checks if 'resolved_by' is set in custom_attributes (set by AI or human via Chatwoot UI/API)
+  if (newStatus === 'resolved' && previousStatus !== 'resolved' && resolvedBy) {
+    const resolutionSource = resolvedBy === 'ai' || resolvedBy === 'human' ? resolvedBy : 'human';
+    
+    await chatwootMetricsService.logResolution({
+      accountId,
+      conversationId: event.conversation.id,
+      resolvedBy: resolutionSource as 'ai' | 'human',
+      resolutionType: 'explicit',
+      aiParticipated: customAttributes.ai_responded === true || customAttributes.ai_participated === true,
+      agentId: event.conversation.assignee_id || null,
+      resolvedAt: new Date(),
+    });
+
+    logger.info('Automatically logged resolution from webhook', {
+      conversationId: event.conversation.id,
+      resolvedBy: resolutionSource,
+      accountId,
+    });
+  }
+
   // Record event for metrics/dashboard
   await eventService.create({
     eventType: 'chatwoot.conversation.status_changed',
@@ -655,7 +702,7 @@ async function handleStatusChanged(accountId: string, event: ChatwootWebhookEven
     payload: {
       conversationId: event.conversation.id,
       status: event.conversation.status,
-      previousStatus: event.changed_attributes?.[0]?.previous_value,
+      previousStatus,
     },
   });
 }
