@@ -9,6 +9,10 @@ const router = Router();
 // ============================================
 router.post('/webhook', (req, res, next) => chatwootController.handleWebhook(req, res, next));
 
+// Public endpoint for external automation (n8n) to log resolutions.
+// Optional shared-secret protection via header `x-webhook-secret` (CHATWOOT_WEBHOOK_SECRET).
+router.post('/log-resolution', (req, res, next) => chatwootController.logResolution(req, res, next));
+
 // ============================================
 // Credential-based routes (no accountId needed)
 // Super Admin can use these when creating new accounts
