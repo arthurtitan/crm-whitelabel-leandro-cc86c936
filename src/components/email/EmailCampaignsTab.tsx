@@ -85,6 +85,7 @@ export default function EmailCampaignsTab() {
   const [stepForm, setStepForm] = useState<{ dayNumber: number; subject: string; bodyHtml: string; bodyText: string; templateId: string | null }>({ dayNumber: 1, subject: '', bodyHtml: '', bodyText: '', templateId: null });
   const [showStepAI, setShowStepAI] = useState(false);
   const [previewStep, setPreviewStep] = useState<EmailCadenceStep | null>(null);
+  const [expandedStepId, setExpandedStepId] = useState<string | null>(null);
 
   // Quick template editor (opened from a step)
   const [editingTemplate, setEditingTemplate] = useState<EmailTemplate | null>(null);
