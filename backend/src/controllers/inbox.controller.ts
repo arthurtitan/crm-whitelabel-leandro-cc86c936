@@ -139,4 +139,86 @@ Responda em formato JSON: {"subject":"...","bodyHtml":"...","bodyText":"..."}`;
       next(error);
     }
   },
+
+  // Diagnostics: tells the admin if inbox is wired up correctly
+  async getDiagnostics(req: Request, res: Response, next: NextFunction) {
+    try {
+      const accountId = getAccountId(req);
+      const proto = (req.headers['x-forwarded-proto'] as string) || req.protocol;
+      const host = (req.headers['x-forwarded-host'] as string) || req.get('host');
+      const webhookUrl = `${proto}://${host}/api/email/inbound/webhook`;
+
+      const [total, unread, latest, sendgridCfg] = await Promise.all([
+        prisma.emailInboxMessage.count({ where: { accountId } }),
+        prisma.emailInboxMessage.count({ where: { accountId, read: false } }),
+        prisma.emailInboxMessage.findFirst({
+          where: { accountId },
+          orderBy: { receivedAt: 'desc' },
+          select: { receivedAt: true, fromEmail: true },
+        }),
+        prisma.account.findUnique({
+          where: { id: accountId },
+          select: { sendgridFromEmail: true, sendgridApiKey: true },
+        }),
+      ]);
+
+      res.json({
+        webhookUrl,
+        totalMessages: total,
+        unreadMessages: unread,
+        latestReceivedAt: latest?.receivedAt || null,
+        latestFromEmail: latest?.fromEmail || null,
+        sendgridConfigured: !!sendgridCfg?.sendgridApiKey,
+        sendgridFromEmail: sendgridCfg?.sendgridFromEmail || null,
+      });
+    } catch (error) { next(error); }
+  },
+
+  // Mark as replied manually (when user replied outside the platform)
+  async markRepliedManually(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await prisma.emailInboxMessage.update({
+        where: { id: req.params.id as string },
+        data: { replied: true, repliedAt: new Date(), read: true },
+      });
+      res.json(data);
+    } catch (error) { next(error); }
+  },
+
+  // Pause / Resume / Unenroll the cadence linked to a message
+  async pauseEnrollment(req: Request, res: Response, next: NextFunction) {
+    try {
+      const message = await inboxService.getMessage(req.params.id as string);
+      if (!message?.enrollmentId) return res.status(404).json({ error: 'Mensagem sem inscrição vinculada' });
+      const updated = await prisma.emailEnrollment.update({
+        where: { id: message.enrollmentId },
+        data: { status: 'paused' },
+      });
+      res.json({ success: true, enrollment: updated });
+    } catch (error) { next(error); }
+  },
+
+  async resumeEnrollment(req: Request, res: Response, next: NextFunction) {
+    try {
+      const message = await inboxService.getMessage(req.params.id as string);
+      if (!message?.enrollmentId) return res.status(404).json({ error: 'Mensagem sem inscrição vinculada' });
+      const updated = await prisma.emailEnrollment.update({
+        where: { id: message.enrollmentId },
+        data: { status: 'active' },
+      });
+      res.json({ success: true, enrollment: updated });
+    } catch (error) { next(error); }
+  },
+
+  async unenrollFromCadence(req: Request, res: Response, next: NextFunction) {
+    try {
+      const message = await inboxService.getMessage(req.params.id as string);
+      if (!message?.enrollmentId) return res.status(404).json({ error: 'Mensagem sem inscrição vinculada' });
+      const updated = await prisma.emailEnrollment.update({
+        where: { id: message.enrollmentId },
+        data: { status: 'unsubscribed', completedAt: new Date() },
+      });
+      res.json({ success: true, enrollment: updated });
+    } catch (error) { next(error); }
+  },
 };

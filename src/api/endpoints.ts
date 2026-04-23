@@ -215,8 +215,13 @@ export const API_ENDPOINTS = {
     // Inbox
     INBOX: '/api/email/inbox',
     INBOX_UNREAD: '/api/email/inbox/unread',
+    INBOX_DIAGNOSTICS: '/api/email/inbox/diagnostics',
     INBOX_MESSAGE: (id: string) => `/api/email/inbox/${id}`,
     INBOX_MARK_READ: (id: string) => `/api/email/inbox/${id}/read`,
+    INBOX_MARK_REPLIED: (id: string) => `/api/email/inbox/${id}/replied`,
+    INBOX_PAUSE_ENROLLMENT: (id: string) => `/api/email/inbox/${id}/pause-enrollment`,
+    INBOX_RESUME_ENROLLMENT: (id: string) => `/api/email/inbox/${id}/resume-enrollment`,
+    INBOX_UNENROLL: (id: string) => `/api/email/inbox/${id}/unenroll`,
     INBOX_REPLY: '/api/email/inbox/reply',
     INBOX_SUGGEST_REPLY: '/api/email/inbox/suggest-reply',
   },

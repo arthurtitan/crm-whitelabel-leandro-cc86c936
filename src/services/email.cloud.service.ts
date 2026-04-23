@@ -524,6 +524,30 @@ export const emailCloudService = {
     return { subject: '', bodyHtml: '', bodyText: '' };
   },
 
+  async getInboxDiagnostics(): Promise<any> {
+    return {
+      webhookUrl: 'N/A no modo Cloud',
+      totalMessages: 0,
+      unreadMessages: 0,
+      latestReceivedAt: null,
+      latestFromEmail: null,
+      sendgridConfigured: false,
+      sendgridFromEmail: null,
+    };
+  },
+
+  async markInboxRepliedManually(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('email_inbox_messages' as any)
+      .update({ replied: true, replied_at: new Date().toISOString(), read: true })
+      .eq('id', id);
+    if (error) throw new Error(error.message);
+  },
+
+  async pauseEnrollmentFromInbox(_id: string): Promise<void> { /* no-op cloud */ },
+  async resumeEnrollmentFromInbox(_id: string): Promise<void> { /* no-op cloud */ },
+  async unenrollFromInbox(_id: string): Promise<void> { /* no-op cloud */ },
+
   // ==================== SEARCH ====================
   async searchByEmail(email: string): Promise<any> {
     const { data: contact } = await supabase
