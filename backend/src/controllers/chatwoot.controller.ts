@@ -655,7 +655,7 @@ async function handleStatusChanged(accountId: string, event: ChatwootWebhookEven
     payload: {
       conversationId: event.conversation.id,
       status: event.conversation.status,
-      previousStatus,
+      previousStatus: event.changed_attributes?.[0]?.previous_value,
     },
   });
 }
