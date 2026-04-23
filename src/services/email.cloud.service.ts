@@ -250,16 +250,23 @@ export const emailCloudService = {
   },
 
   async getSendStats(): Promise<SendStats> {
-    const { data, error } = await supabase.from('email_sends').select('status');
+    const { data, error } = await supabase.from('email_sends').select('status, sent_at, opened_at, clicked_at, bounced_at');
     if (error) throw new Error(error.message);
     const rows = data || [];
+    
     return {
       total: rows.length,
-      sent: rows.filter(r => r.status === 'sent').length,
-      delivered: rows.filter(r => r.status === 'delivered').length,
-      opened: rows.filter(r => r.status === 'opened').length,
-      clicked: rows.filter(r => r.status === 'clicked').length,
-      bounced: rows.filter(r => r.status === 'bounced').length,
+      // Sent: Anything that was sent (not just currently in 'sent' status)
+      sent: rows.filter(r => r.sent_at || ['sent', 'delivered', 'opened', 'clicked', 'bounced'].includes(r.status)).length,
+      // Delivered: Reached destination
+      delivered: rows.filter(r => ['delivered', 'opened', 'clicked'].includes(r.status)).length,
+      // Opened: Actually opened
+      opened: rows.filter(r => r.opened_at || ['opened', 'clicked'].includes(r.status)).length,
+      // Clicked: Actually clicked
+      clicked: rows.filter(r => r.clicked_at || r.status === 'clicked').length,
+      // Bounced: Refused by recipient server
+      bounced: rows.filter(r => r.bounced_at || r.status === 'bounced').length,
+      // Failed: Technical failure before sending
       failed: rows.filter(r => r.status === 'failed').length,
     };
   },
@@ -453,16 +460,17 @@ export const emailCloudService = {
     // Aggregate sends
     const { data: sends } = await supabase
       .from('email_sends')
-      .select('status')
+      .select('status, sent_at, opened_at, clicked_at, bounced_at')
       .in('enrollment_id', enrollmentIds);
     const s = sends || [];
+    
     return {
       total: s.length,
-      sent: s.filter((x: any) => x.status === 'sent').length,
-      delivered: s.filter((x: any) => x.status === 'delivered').length,
-      opened: s.filter((x: any) => x.status === 'opened').length,
-      clicked: s.filter((x: any) => x.status === 'clicked').length,
-      bounced: s.filter((x: any) => x.status === 'bounced').length,
+      sent: s.filter((x: any) => x.sent_at || ['sent', 'delivered', 'opened', 'clicked', 'bounced'].includes(x.status)).length,
+      delivered: s.filter((x: any) => ['delivered', 'opened', 'clicked'].includes(x.status)).length,
+      opened: s.filter((x: any) => x.opened_at || ['opened', 'clicked'].includes(x.status)).length,
+      clicked: s.filter((x: any) => x.clicked_at || x.status === 'clicked').length,
+      bounced: s.filter((x: any) => x.bounced_at || x.status === 'bounced').length,
       failed: s.filter((x: any) => x.status === 'failed').length,
       enrollments: enrollmentRows?.length || 0,
     };
