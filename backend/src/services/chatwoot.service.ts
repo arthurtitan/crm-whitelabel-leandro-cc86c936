@@ -407,6 +407,33 @@ class ChatwootService {
     return response.payload || [];
   }
 
+  /**
+   * Update conversation custom attributes
+   */
+  async updateConversationCustomAttributes(
+    accountId: string,
+    conversationId: number,
+    customAttributes: Record<string, any>
+  ): Promise<ChatwootConversation> {
+    const config = await this.getAccountConfig(accountId);
+
+    const response = await this.makeRequest<ChatwootConversation>(
+      config,
+      `/conversations/${conversationId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ custom_attributes: customAttributes }),
+      }
+    );
+
+    logger.info('Conversation custom attributes updated', {
+      accountId,
+      conversationId,
+      customAttributes,
+    });
+    return response;
+  }
+
   // ============================================
   // Contacts
   // ============================================
