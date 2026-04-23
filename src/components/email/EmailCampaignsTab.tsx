@@ -633,14 +633,19 @@ export default function EmailCampaignsTab() {
                 <div className="flex items-start gap-2 overflow-x-auto pb-2">
                   {steps.map((step, idx) => (
                     <div key={step.id} className="flex items-center gap-2">
-                      <div className={`relative min-w-[130px] p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                        idx === 0 ? 'border-primary bg-primary/5' : 'border-border bg-muted/30'
-                      }`}>
+                      <div
+                        onClick={() => setExpandedStepId(prev => prev === step.id ? null : step.id)}
+                        className={`relative min-w-[130px] p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                          expandedStepId === step.id
+                            ? 'border-primary bg-primary/10 ring-2 ring-primary/30'
+                            : idx === 0 ? 'border-primary/60 bg-primary/5' : 'border-border bg-muted/30 hover:border-primary/40'
+                        }`}
+                      >
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-sm font-semibold">Dia {step.day_number}</span>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm" className="h-5 w-5 p-0"><MoreHorizontal className="w-3 h-3" /></Button>
+                              <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={(e) => e.stopPropagation()}><MoreHorizontal className="w-3 h-3" /></Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent>
                               <DropdownMenuItem onClick={() => setPreviewStep(step)}><Eye className="w-3 h-3 mr-2" /> Preview</DropdownMenuItem>
