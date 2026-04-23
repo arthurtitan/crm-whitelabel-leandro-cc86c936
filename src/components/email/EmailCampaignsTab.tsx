@@ -689,6 +689,30 @@ export default function EmailCampaignsTab() {
                     <Plus className="w-5 h-5 text-muted-foreground" />
                   </button>
                 </div>
+                {steps.length > 0 && (
+                  <p className="text-[10px] text-muted-foreground mt-2">
+                    💡 Clique em um step para ver quem vai receber / quem já recebeu este e-mail.
+                  </p>
+                )}
+                {expandedStepId && steps.find(s => s.id === expandedStepId) && (
+                  <div className="mt-4 pt-4 border-t border-border/50 space-y-3">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <Users className="w-4 h-4 text-primary" />
+                      Destinatários — Dia {steps.find(s => s.id === expandedStepId)?.day_number} ·{' '}
+                      <span className="text-muted-foreground font-normal truncate">
+                        {steps.find(s => s.id === expandedStepId)?.subject}
+                      </span>
+                    </div>
+                    <StepRecipientsPanel
+                      key={expandedStepId}
+                      cadenceId={selectedCadence.id}
+                      stepId={expandedStepId}
+                      stepDayNumber={steps.find(s => s.id === expandedStepId)?.day_number || 1}
+                      cadenceStartDate={selectedCadence.start_date}
+                      cadenceSendAtTime={selectedCadence.send_at_time}
+                    />
+                  </div>
+                )}
               </CardContent>
             </Card>
           ) : (
