@@ -313,22 +313,45 @@ export const emailCloudService = {
     if (error) throw new Error(error.message);
   },
 
-  // ==================== PROCESS QUEUE (no-op in cloud) ====================
+  // ==================== PROCESS QUEUE (calls edge function) ====================
   async processQueue(): Promise<{ success: boolean; processed: number }> {
-    return { success: true, processed: 0 };
+    const { data, error } = await supabase.functions.invoke('email-integration', {
+      body: { action: 'process-queue' },
+    });
+    if (error) throw new Error(error.message);
+    return data;
   },
 
-  // ==================== TESTS (no-op in cloud) ====================
-  async testSendgrid(_apiKey: string): Promise<{ success: boolean; message: string }> {
-    return { success: false, message: 'Teste de conexão requer backend Express.' };
+  // ==================== TESTS (calls edge function) ====================
+  async testSendgrid(apiKey: string): Promise<{ success: boolean; message: string }> {
+    const { data, error } = await supabase.functions.invoke('email-integration', {
+      body: { action: 'test-connection', apiKey },
+    });
+    if (error) throw new Error(error.message);
+    return data;
   },
 
-  async testSendEmail(_apiKey: string, _fromEmail: string, _fromName: string, _toEmail: string, _options?: { subject?: string; html?: string; text?: string }): Promise<{ success: boolean; messageId?: string; error?: string }> {
-    return { success: false, error: 'Envio de teste requer backend Express.' };
+  async testSendEmail(apiKey: string, fromEmail: string, fromName: string, toEmail: string, options?: { subject?: string; html?: string; text?: string }): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    const { data, error } = await supabase.functions.invoke('email-integration', {
+      body: { 
+        action: 'test-send', 
+        apiKey, 
+        fromEmail, 
+        fromName, 
+        toEmail,
+        subject: options?.subject,
+        html: options?.html,
+        text: options?.text,
+      },
+    });
+    if (error) throw new Error(error.message);
+    return data;
   },
 
-  async testOpenai(_apiKey: string): Promise<{ success: boolean; message: string }> {
-    return { success: false, message: 'Teste de OpenAI requer backend Express.' };
+  async testOpenai(apiKey: string): Promise<{ success: boolean; message: string }> {
+    // This might still need backend or another edge function, but let's at least try to route it if needed.
+    // For now, let's keep it as is or route to email-integration if I add OpenAI there.
+    return { success: false, message: 'Teste de OpenAI requer implementação de Edge Function.' };
   },
 
   // ==================== RULES ====================
