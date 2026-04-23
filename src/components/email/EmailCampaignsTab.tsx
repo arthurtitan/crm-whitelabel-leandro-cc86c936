@@ -40,6 +40,7 @@ import EmailAIChat from '@/components/email/EmailAIChat';
 import EmailTemplatesTab from '@/components/email/EmailTemplatesTab';
 import EmailSendsTab from '@/components/email/EmailSendsTab';
 import EmailInboxTab from '@/components/email/EmailInboxTab';
+import StepRecipientsPanel from '@/components/email/StepRecipientsPanel';
 import { apiClient } from '@/api/client';
 import { API_ENDPOINTS } from '@/api/endpoints';
 
@@ -84,6 +85,7 @@ export default function EmailCampaignsTab() {
   const [stepForm, setStepForm] = useState<{ dayNumber: number; subject: string; bodyHtml: string; bodyText: string; templateId: string | null }>({ dayNumber: 1, subject: '', bodyHtml: '', bodyText: '', templateId: null });
   const [showStepAI, setShowStepAI] = useState(false);
   const [previewStep, setPreviewStep] = useState<EmailCadenceStep | null>(null);
+  const [expandedStepId, setExpandedStepId] = useState<string | null>(null);
 
   // Quick template editor (opened from a step)
   const [editingTemplate, setEditingTemplate] = useState<EmailTemplate | null>(null);
@@ -631,14 +633,19 @@ export default function EmailCampaignsTab() {
                 <div className="flex items-start gap-2 overflow-x-auto pb-2">
                   {steps.map((step, idx) => (
                     <div key={step.id} className="flex items-center gap-2">
-                      <div className={`relative min-w-[130px] p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                        idx === 0 ? 'border-primary bg-primary/5' : 'border-border bg-muted/30'
-                      }`}>
+                      <div
+                        onClick={() => setExpandedStepId(prev => prev === step.id ? null : step.id)}
+                        className={`relative min-w-[130px] p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                          expandedStepId === step.id
+                            ? 'border-primary bg-primary/10 ring-2 ring-primary/30'
+                            : idx === 0 ? 'border-primary/60 bg-primary/5' : 'border-border bg-muted/30 hover:border-primary/40'
+                        }`}
+                      >
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-sm font-semibold">Dia {step.day_number}</span>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm" className="h-5 w-5 p-0"><MoreHorizontal className="w-3 h-3" /></Button>
+                              <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={(e) => e.stopPropagation()}><MoreHorizontal className="w-3 h-3" /></Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent>
                               <DropdownMenuItem onClick={() => setPreviewStep(step)}><Eye className="w-3 h-3 mr-2" /> Preview</DropdownMenuItem>
@@ -682,6 +689,30 @@ export default function EmailCampaignsTab() {
                     <Plus className="w-5 h-5 text-muted-foreground" />
                   </button>
                 </div>
+                {steps.length > 0 && (
+                  <p className="text-[10px] text-muted-foreground mt-2">
+                    💡 Clique em um step para ver quem vai receber / quem já recebeu este e-mail.
+                  </p>
+                )}
+                {expandedStepId && steps.find(s => s.id === expandedStepId) && (
+                  <div className="mt-4 pt-4 border-t border-border/50 space-y-3">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <Users className="w-4 h-4 text-primary" />
+                      Destinatários — Dia {steps.find(s => s.id === expandedStepId)?.day_number} ·{' '}
+                      <span className="text-muted-foreground font-normal truncate">
+                        {steps.find(s => s.id === expandedStepId)?.subject}
+                      </span>
+                    </div>
+                    <StepRecipientsPanel
+                      key={expandedStepId}
+                      cadenceId={selectedCadence.id}
+                      stepId={expandedStepId}
+                      stepDayNumber={steps.find(s => s.id === expandedStepId)?.day_number || 1}
+                      cadenceStartDate={selectedCadence.start_date}
+                      cadenceSendAtTime={selectedCadence.send_at_time}
+                    />
+                  </div>
+                )}
               </CardContent>
             </Card>
           ) : (
