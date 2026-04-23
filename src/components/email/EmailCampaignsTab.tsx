@@ -119,10 +119,14 @@ export default function EmailCampaignsTab() {
   }, [setSearchParams]);
 
   useEffect(() => {
-    selectedCampaignIdRef.current = selectedCampaign?.id || null;
-    selectedCadenceIdRef.current = selectedCadence?.id || null;
-    updateUrlSelection(selectedCampaign?.id || null, selectedCadence?.id || null);
-  }, [selectedCampaign, selectedCadence, updateUrlSelection]);
+    // Only sync back to URL if we have a selection AND we aren't currently loading the list
+    // This prevents the refresh from clearing the searchParams before they are processed by loadData
+    if (!loading && selectedCampaign) {
+      selectedCampaignIdRef.current = selectedCampaign.id;
+      selectedCadenceIdRef.current = selectedCadence?.id || null;
+      updateUrlSelection(selectedCampaign.id, selectedCadence?.id || null);
+    }
+  }, [selectedCampaign, selectedCadence, updateUrlSelection, loading]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
