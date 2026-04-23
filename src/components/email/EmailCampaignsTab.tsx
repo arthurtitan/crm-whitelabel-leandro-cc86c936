@@ -735,7 +735,10 @@ export default function EmailCampaignsTab() {
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm flex items-center gap-2">
-                    <GitBranch className="w-4 h-4" /> Ramificações
+                    <GitBranch className="w-4 h-4" /> Ramificações saindo de
+                    <Badge variant="outline" className="text-xs ml-1 max-w-[180px] truncate">
+                      {selectedCadence.name}
+                    </Badge>
                   </CardTitle>
                   <Button variant="ghost" size="sm" onClick={() => {
                     setRuleForm({ triggerEvent: 'opened', targetCadenceId: '', delayHours: 0, timeoutHours: 48 });
@@ -744,10 +747,17 @@ export default function EmailCampaignsTab() {
                     <Plus className="w-4 h-4 mr-1" /> Nova Regra
                   </Button>
                 </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Regras movem leads <strong>desta cadência</strong> para outra quando o evento ocorre.
+                  Para ver regras que terminam aqui, selecione a cadência de origem.
+                </p>
               </CardHeader>
               <CardContent>
                 {(selectedCadence.rules || []).length === 0 ? (
-                  <p className="text-center text-sm text-muted-foreground py-3">Nenhuma regra configurada</p>
+                  <p className="text-center text-sm text-muted-foreground py-3">
+                    Nenhuma regra saindo de <strong>{selectedCadence.name}</strong>.
+                    Clique em "Nova Regra" para criar uma ramificação a partir desta cadência.
+                  </p>
                 ) : (
                   <div className="space-y-2">
                     {(selectedCadence.rules || []).map(rule => (
