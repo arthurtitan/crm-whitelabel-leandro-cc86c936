@@ -416,42 +416,6 @@ async function fetchInboxes(
 // ============================================================================
 
 class ChatwootMetricsService {
-  /**
-   * Log a conversation resolution to the database
-   */
-  async logResolution(data: {
-    accountId: string;
-    conversationId: number;
-    resolvedBy: 'ai' | 'human';
-    resolutionType?: string;
-    aiParticipated?: boolean;
-    agentId?: number | null;
-    resolvedAt?: Date;
-  }) {
-    try {
-      await prisma.resolutionLog.create({
-        data: {
-          accountId: data.accountId,
-          conversationId: data.conversationId,
-          resolvedBy: data.resolvedBy,
-          resolutionType: data.resolutionType || 'explicit',
-          aiParticipated: data.aiParticipated ?? false,
-          agentId: data.agentId || null,
-          resolvedAt: data.resolvedAt || new Date(),
-        },
-      });
-
-      logger.info('[Metrics] Resolution logged', {
-        accountId: data.accountId,
-        conversationId: data.conversationId,
-        resolvedBy: data.resolvedBy,
-      });
-    } catch (error) {
-      // Log error but don't fail (idempotency or transient DB issues)
-      logger.error('[Metrics] Failed to log resolution', { error, data });
-    }
-  }
-
   async computeMetrics(dbAccountId: string, params: MetricsParams) {
     // 1. Get Chatwoot config from DB
     const account = await prisma.account.findUnique({
