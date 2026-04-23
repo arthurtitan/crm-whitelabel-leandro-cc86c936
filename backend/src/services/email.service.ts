@@ -581,7 +581,14 @@ export const emailService = {
         },
       });
 
-       if (!send?.enrollment || send.enrollment.status !== 'active' || !send.enrollment.cadence?.rulesFrom?.length) return;
+       // NOTE: We intentionally do NOT require status === 'active' here.
+       // Single-step cadences mark the enrollment as 'completed' as soon as the
+       // only step is sent. The 'opened' / 'clicked' / 'bounced' events naturally
+       // arrive AFTER that completion, so requiring an active enrollment would
+       // make the rule never fire for completed enrollments. Duplicate enrollment
+       // protection is already handled inside applyBranchingRule().
+       if (!send?.enrollment || !send.enrollment.cadence?.rulesFrom?.length) return;
+       if (send.enrollment.status === 'unsubscribed' || send.enrollment.status === 'paused') return;
 
       const matchingRule = send.enrollment.cadence.rulesFrom.find(
         r => r.triggerEvent === triggerEvent
