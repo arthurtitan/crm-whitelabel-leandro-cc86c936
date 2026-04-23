@@ -610,12 +610,15 @@ export const emailService = {
     enrollment: { id: string; contactId: string },
     accountId: string
   ) {
-    // Check if already enrolled in target cadence
+    // Avoid creating a duplicate enrollment if the contact is already running
+    // (or paused, awaiting resume) in the target cadence. Completed/unsubscribed
+    // enrollments do NOT block re-entering — the rule should be able to move
+    // the contact in again on a new event.
     const existing = await prisma.emailEnrollment.findFirst({
       where: {
         cadenceId: rule.targetCadenceId,
         contactId: enrollment.contactId,
-        status: 'active',
+        status: { in: ['active', 'paused'] },
       },
     });
 
