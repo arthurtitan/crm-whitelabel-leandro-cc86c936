@@ -40,6 +40,7 @@ import EmailAIChat from '@/components/email/EmailAIChat';
 import EmailTemplatesTab from '@/components/email/EmailTemplatesTab';
 import EmailSendsTab from '@/components/email/EmailSendsTab';
 import EmailInboxTab from '@/components/email/EmailInboxTab';
+import StepRecipientsPanel from '@/components/email/StepRecipientsPanel';
 import { apiClient } from '@/api/client';
 import { API_ENDPOINTS } from '@/api/endpoints';
 
