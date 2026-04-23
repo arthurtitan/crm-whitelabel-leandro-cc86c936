@@ -18,18 +18,19 @@ Deno.serve(async (req) => {
 
   try {
     // Get backend URL from env or use default
-    const backendUrl = Deno.env.get('BACKEND_API_URL') || 'https://api.goodleads.com.br';
+    const backendUrl = Deno.env.get('BACKEND_API_URL') || 'https://goodleads.mychooice.com';
     const serviceKey = Deno.env.get('BACKEND_SERVICE_KEY') || '';
 
-    const response = await fetch(`${backendUrl}/api/emails/process`, {
+    const response = await fetch(`${backendUrl}/api/email/process-queue`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${serviceKey}`,
       },
+      body: JSON.stringify({}),
     });
 
-    const data = await response.json();
+    const data = await response.json().catch(() => ({}));
 
     return new Response(JSON.stringify({
       success: true,
