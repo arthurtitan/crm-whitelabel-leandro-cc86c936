@@ -26,8 +26,13 @@ router.post('/campaigns/:id/dispatch-now', requirePermission('emails'), (req, re
 // Inbox
 router.get('/inbox', requirePermission('emails'), (req, res, next) => inboxController.listMessages(req, res, next));
 router.get('/inbox/unread', requirePermission('emails'), (req, res, next) => inboxController.getUnreadCount(req, res, next));
+router.get('/inbox/diagnostics', requirePermission('emails'), (req, res, next) => inboxController.getDiagnostics(req, res, next));
 router.get('/inbox/:id', requirePermission('emails'), (req, res, next) => inboxController.getMessage(req, res, next));
 router.put('/inbox/:id/read', requirePermission('emails'), (req, res, next) => inboxController.markRead(req, res, next));
+router.put('/inbox/:id/replied', requirePermission('emails'), (req, res, next) => inboxController.markRepliedManually(req, res, next));
+router.post('/inbox/:id/pause-enrollment', requirePermission('emails'), (req, res, next) => inboxController.pauseEnrollment(req, res, next));
+router.post('/inbox/:id/resume-enrollment', requirePermission('emails'), (req, res, next) => inboxController.resumeEnrollment(req, res, next));
+router.post('/inbox/:id/unenroll', requirePermission('emails'), (req, res, next) => inboxController.unenrollFromCadence(req, res, next));
 router.post('/inbox/reply', requirePermission('emails'), (req, res, next) => inboxController.reply(req, res, next));
 router.post('/inbox/suggest-reply', requirePermission('emails'), (req, res, next) => inboxController.suggestReply(req, res, next));
 
