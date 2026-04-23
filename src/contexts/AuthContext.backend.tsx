@@ -73,6 +73,31 @@ interface AuthState {
   authError: string | null;
 }
 
+const AUTH_CACHE_KEY = 'backend_auth_cache';
+
+function readAuthCache(): { user: User; account: Account | null } | null {
+  try {
+    const raw = localStorage.getItem(AUTH_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.user) return null;
+    return {
+      user: parsed.user as User,
+      account: (parsed.account ?? null) as Account | null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeAuthCache(user: User, account: Account | null): void {
+  localStorage.setItem(AUTH_CACHE_KEY, JSON.stringify({ user, account, cachedAt: new Date().toISOString() }));
+}
+
+function clearAuthCache(): void {
+  localStorage.removeItem(AUTH_CACHE_KEY);
+}
+
 export function BackendAuthProvider({ children }: { children: ReactNode }) {
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
@@ -96,6 +121,7 @@ export function BackendAuthProvider({ children }: { children: ReactNode }) {
     
     if (!token) {
       console.log('[BackendAuth] No token found, finalizing loading');
+      clearAuthCache();
       setAuthState(prev => ({ ...prev, isLoading: false }));
       return;
     }
@@ -108,10 +134,14 @@ export function BackendAuthProvider({ children }: { children: ReactNode }) {
 
       if (!mountedRef.current) return;
 
+      const normalizedUser = normalizeUser(response.user);
+      const normalizedAccount = normalizeAccount(response.account);
+
       console.log('[BackendAuth] Hydration successful for:', response.user?.email);
+      writeAuthCache(normalizedUser, normalizedAccount);
       setAuthState({
-        user: normalizeUser(response.user),
-        account: normalizeAccount(response.account),
+        user: normalizedUser,
+        account: normalizedAccount,
         isAuthenticated: true,
         isLoading: false,
         authError: null,
@@ -124,25 +154,63 @@ export function BackendAuthProvider({ children }: { children: ReactNode }) {
       if (error?.status === 401) {
         console.log('[BackendAuth] Token invalid/expired, clearing tokens');
         tokenManager.clearTokens();
+        clearAuthCache();
+        if (mountedRef.current) {
+          setAuthState({
+            user: null,
+            account: null,
+            isAuthenticated: false,
+            isLoading: false,
+            authError: null,
+          });
+        }
+        return;
       }
+
+      const cached = readAuthCache();
       
       if (mountedRef.current) {
-        setAuthState(prev => ({ 
-          ...prev, 
-          isLoading: false,
-          isAuthenticated: false, // Ensure we are not authenticated if fetch failed
-        }));
+        if (cached) {
+          console.warn('[BackendAuth] Falling back to cached auth session after transient failure');
+          setAuthState({
+            user: cached.user,
+            account: cached.account,
+            isAuthenticated: true,
+            isLoading: false,
+            authError: null,
+          });
+        } else {
+          setAuthState(prev => ({ 
+            ...prev, 
+            isLoading: false,
+            isAuthenticated: false,
+          }));
+        }
       }
     }
   }, []);
 
   useEffect(() => {
     mountedRef.current = true;
+
+    const token = tokenManager.getToken();
+    const cached = token ? readAuthCache() : null;
+    if (cached) {
+      setAuthState({
+        user: cached.user,
+        account: cached.account,
+        isAuthenticated: true,
+        isLoading: true,
+        authError: null,
+      });
+    }
+
     hydrateFromToken();
 
     const handleUnauthorized = () => {
       if (!mountedRef.current) return;
       tokenManager.clearTokens();
+      clearAuthCache();
       setAuthState({
         user: null, account: null, isAuthenticated: false, isLoading: false, authError: null,
       });
@@ -167,12 +235,16 @@ export function BackendAuthProvider({ children }: { children: ReactNode }) {
       // Support both { data: { user, token, ... } } and flat response
       const response = raw?.data ?? raw;
 
+      const normalizedUser = normalizeUser(response.user);
+      const normalizedAccount = normalizeAccount(response.account);
+
       tokenManager.setToken(response.token);
       tokenManager.setRefreshToken(response.refreshToken);
+      writeAuthCache(normalizedUser, normalizedAccount);
 
       setAuthState({
-        user: normalizeUser(response.user),
-        account: normalizeAccount(response.account),
+        user: normalizedUser,
+        account: normalizedAccount,
         isAuthenticated: true,
         isLoading: false,
         authError: null,
@@ -198,6 +270,7 @@ export function BackendAuthProvider({ children }: { children: ReactNode }) {
       console.error('[BackendAuth] Logout error:', error);
     } finally {
       tokenManager.clearTokens();
+      clearAuthCache();
       setAuthState({
         user: null, account: null, isAuthenticated: false, isLoading: false, authError: null,
       });
@@ -229,6 +302,7 @@ export function BackendAuthProvider({ children }: { children: ReactNode }) {
 
       const targetUser = normalizeUser(response.user);
       const targetAccount = normalizeAccount(response.account);
+      writeAuthCache(targetUser, targetAccount);
 
       setOriginalUser(authState.user);
       setIsImpersonating(true);
@@ -253,6 +327,7 @@ export function BackendAuthProvider({ children }: { children: ReactNode }) {
       tokenManager.setToken(originalToken);
       localStorage.removeItem('original_token');
     }
+    writeAuthCache(originalUser, null);
     setAuthState(prev => ({ ...prev, user: originalUser, account: null }));
     setOriginalUser(null);
     setIsImpersonating(false);
