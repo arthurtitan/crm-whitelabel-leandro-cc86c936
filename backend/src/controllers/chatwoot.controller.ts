@@ -143,14 +143,16 @@ class ChatwootController {
         return res.status(404).json({ error: 'Unknown Chatwoot account' });
       }
 
-      // Idempotent insert via unique (account_id, conversation_id)
+      // Allow multiple resolutions per conversation (one row per resolution cycle).
+      // Reopens followed by new closures generate additional rows — n8n is responsible
+      // for clearing custom_attributes.resolved_by on conversation reopen so the next
+      // resolution is attributed correctly (ai vs human).
       await prisma.$executeRaw`
         INSERT INTO resolution_logs
           (account_id, conversation_id, resolved_by, resolution_type, ai_participated, agent_id, resolved_at)
         VALUES
           (${account.id}::uuid, ${Number(conversation_id)}, ${resolved_by}, ${resolution_type},
            ${Boolean(ai_participated)}, ${agent_id ? Number(agent_id) : null}, NOW())
-        ON CONFLICT (account_id, conversation_id) DO NOTHING
       `;
 
       logger.info('[log-resolution] Logged', {
