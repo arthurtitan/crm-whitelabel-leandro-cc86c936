@@ -194,6 +194,7 @@ export const API_ENDPOINTS = {
     ENROLLMENTS: '/api/email/enrollments',
     SENDS: '/api/email/sends',
     SEND_STATS: '/api/email/sends/stats',
+    QUOTA: '/api/email/quota',
     AI_GENERATE: '/api/email/ai/generate',
     SETTINGS: '/api/email/settings',
     PROCESS_QUEUE: '/api/email/process',

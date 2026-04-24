@@ -39,6 +39,9 @@ router.get('/enrollments', requirePermission('emails'), (req, res, next) => emai
 router.get('/sends', requirePermission('emails'), (req, res, next) => emailController.listSends(req, res, next));
 router.get('/sends/stats', requirePermission('emails'), (req, res, next) => emailController.getSendStats(req, res, next));
 
+// Quota (mensal + diário)
+router.get('/quota', requirePermission('emails'), (req, res, next) => emailController.getQuota(req, res, next));
+
 // AI
 router.post('/ai/generate', requirePermission('emails'), (req, res, next) => emailController.generateEmail(req, res, next));
 
