@@ -1,5 +1,8 @@
  import { useState, useCallback, useEffect } from 'react';
  import { supabase } from '@/integrations/supabase/client';
+import { useBackend } from '@/config/backend.config';
+import { apiClient } from '@/api/client';
+import { API_ENDPOINTS } from '@/api/endpoints';
 import { useAuth } from '@/contexts/AuthContext';
 import { ExtractionSearchForm } from '@/components/extracao/ExtractionSearchForm';
 import { ExtractionResultsTable } from '@/components/extracao/ExtractionResultsTable';
@@ -28,32 +31,38 @@ export default function AdminExtracaoPage() {
    
    const fetchUsage = useCallback(async () => {
      if (!account?.id) return;
-     
-     try {
-       // Use the helper function we created
-       const { data: usedCount, error: usageError } = await supabase.rpc('get_monthly_extraction_usage', {
-         p_account_id: account.id
-       });
-       
-       if (usageError) throw usageError;
- 
-       // Get the account limit (already available in auth context, but let's refresh to be sure)
-       const { data: accountData, error: accountError } = await supabase
-         .from('accounts')
-         .select('monthly_extraction_limit')
-         .eq('id', account.id)
-         .single();
-         
-       if (accountError) throw accountError;
-       
-       setUsage({
-         used: usedCount || 0,
-         limit: accountData.monthly_extraction_limit || 100
-       });
-     } catch (err) {
-       console.error('Error fetching extraction usage:', err);
-     }
-   }, [account?.id]);
+
+    try {
+      if (useBackend) {
+        // Production: Express backend (VPS)
+        const res = await apiClient.get<{ success: boolean; used: number; limit: number }>(
+          API_ENDPOINTS.PROSPECTING.USAGE
+        );
+        setUsage({ used: res.used ?? 0, limit: res.limit ?? 500 });
+      } else {
+        // Lovable Cloud (Supabase) fallback
+        const { data: usedCount, error: usageError } = await supabase.rpc(
+          'get_monthly_extraction_usage',
+          { p_account_id: account.id }
+        );
+        if (usageError) throw usageError;
+
+        const { data: accountData, error: accountError } = await supabase
+          .from('accounts')
+          .select('monthly_extraction_limit')
+          .eq('id', account.id)
+          .single();
+        if (accountError) throw accountError;
+
+        setUsage({
+          used: usedCount || 0,
+          limit: accountData.monthly_extraction_limit || 500,
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching extraction usage:', err);
+    }
+  }, [account?.id]);
  
    useEffect(() => {
      fetchUsage();

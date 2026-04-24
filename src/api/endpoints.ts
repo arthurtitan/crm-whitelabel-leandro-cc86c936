@@ -158,6 +158,7 @@ export const API_ENDPOINTS = {
   // ============= PROSPECTING SERVICE =============
   PROSPECTING: {
     EXTRACT: '/api/prospecting/extract',
+    USAGE: '/api/prospecting/usage',
     INBOXES: '/api/prospecting/inboxes',
     DISPATCH: '/api/prospecting/dispatch',
     CANCEL: '/api/prospecting/cancel',

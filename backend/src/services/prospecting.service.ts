@@ -40,6 +40,33 @@ interface InboxAssignment {
 
 class ProspectingService {
   /**
+   * Get current month extraction usage for the account.
+   * Returns "completed extractions" units, where each extraction = 2 raw API requests
+   * (1 geocoding + 1 nearby search). Counter resets monthly (calendar month).
+   */
+  async getUsage(accountId: string): Promise<{ used: number; limit: number }> {
+    const currentMonth = new Date().toISOString().slice(0, 7);
+
+    const [usageLogs, account] = await Promise.all([
+      prisma.apiUsageLog.findMany({
+        where: { accountId, month: currentMonth },
+        select: { requestsCount: true },
+      }),
+      prisma.account.findUnique({
+        where: { id: accountId },
+        select: { monthlyExtractionLimit: true },
+      }),
+    ]);
+
+    const totalRequests = usageLogs.reduce((sum, r) => sum + r.requestsCount, 0);
+    // Each extraction consumes 2 raw API requests; report in "extraction" units to the user
+    const usedExtractions = Math.floor(totalRequests / 2);
+    const limit = (account as any)?.monthlyExtractionLimit ?? 500;
+
+    return { used: usedExtractions, limit };
+  }
+
+  /**
    * Extract leads from Google Maps via RapidAPI
    */
   async extractLeads(accountId: string, nicho: string, localizacao: string) {
@@ -112,7 +139,14 @@ class ProspectingService {
       google_maps_url: p.google_maps_url || '',
     }));
 
-    return { leads, usage: { used: totalUsed + 2, limit } };
+    // Report usage in "extractions" (1 extraction = 2 raw requests)
+    return {
+      leads,
+      usage: {
+        used: Math.floor((totalUsed + 2) / 2),
+        limit,
+      },
+    };
   }
 
   /**

@@ -20,6 +20,7 @@ function mapAccount(raw: any): Account {
     timezone: raw.timezone || 'America/Sao_Paulo',
     plano: raw.plano ?? null,
     limite_usuarios: raw.limiteUsuarios ?? raw.limite_usuarios ?? 10,
+    monthly_extraction_limit: raw.monthlyExtractionLimit ?? raw.monthly_extraction_limit ?? 500,
     chatwoot_base_url: raw.chatwootBaseUrl ?? raw.chatwoot_base_url ?? null,
     chatwoot_account_id: raw.chatwootAccountId ?? raw.chatwoot_account_id ?? null,
     chatwoot_api_key: raw.chatwootApiKey ?? raw.chatwoot_api_key ?? null,
@@ -53,6 +54,7 @@ export const accountsBackendService = {
       chatwootBaseUrl: input.chatwoot_base_url,
       chatwootAccountId: input.chatwoot_account_id,
       chatwootApiKey: input.chatwoot_api_key,
+      monthlyExtractionLimit: input.monthly_extraction_limit,
     });
     const raw = response?.data ?? response;
     return mapAccount(raw);
@@ -66,6 +68,7 @@ export const accountsBackendService = {
       chatwootBaseUrl: input.chatwoot_base_url,
       chatwootAccountId: input.chatwoot_account_id,
       chatwootApiKey: input.chatwoot_api_key,
+      monthlyExtractionLimit: input.monthly_extraction_limit,
       googleClientId: input.google_client_id,
       googleClientSecret: input.google_client_secret,
       googleRedirectUri: input.google_redirect_uri,
