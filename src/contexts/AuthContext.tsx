@@ -1,7 +1,10 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { User as SupabaseUser } from '@supabase/supabase-js';
 import { toast } from 'sonner';
+
+// Minimal type to avoid depending on @supabase/supabase-js at build time
+// (the package may be aliased out in backend-only production builds)
+type SupabaseUser = { id: string; email?: string; [key: string]: any };
 
 // Types
 interface User {
