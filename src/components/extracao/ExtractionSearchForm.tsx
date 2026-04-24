@@ -10,14 +10,21 @@ import { API_ENDPOINTS } from '@/api/endpoints';
 import { useToast } from '@/hooks/use-toast';
 import type { ExtractedLead, ApiUsage } from './types';
 
-interface Props {
-  accountId: string;
-  onResults: (leads: ExtractedLead[], usage?: ApiUsage, meta?: { keyword: string; location: string }) => void;
-  isLoading: boolean;
-  setIsLoading: (v: boolean) => void;
-}
-
-export function ExtractionSearchForm({ accountId, onResults, isLoading, setIsLoading }: Props) {
+ interface Props {
+   accountId: string;
+   onResults: (leads: ExtractedLead[], usage?: ApiUsage, meta?: { keyword: string; location: string }) => void;
+   isLoading: boolean;
+   setIsLoading: (v: boolean) => void;
+   isLimitReached?: boolean;
+ }
+ 
+ export function ExtractionSearchForm({ 
+   accountId, 
+   onResults, 
+   isLoading, 
+   setIsLoading,
+   isLimitReached 
+ }: Props) {
   const [nicho, setNicho] = useState('');
   const [localizacao, setLocalizacao] = useState('');
   const { toast } = useToast();
@@ -29,7 +36,16 @@ export function ExtractionSearchForm({ accountId, onResults, isLoading, setIsLoa
       return;
     }
 
-    setIsLoading(true);
+     if (isLimitReached) {
+       toast({ 
+         title: 'Limite atingido', 
+         description: 'Você atingiu seu limite mensal de extrações. Entre em contato com o suporte para aumentar seu plano.',
+         variant: 'destructive' 
+       });
+       return;
+     }
+ 
+     setIsLoading(true);
     try {
       let data: any;
 
@@ -100,7 +116,10 @@ export function ExtractionSearchForm({ accountId, onResults, isLoading, setIsLoa
               disabled={isLoading}
             />
           </div>
-          <Button type="submit" disabled={isLoading} className="min-w-[140px]">
+           <Button type="submit" disabled={isLoading || isLimitReached} className="min-w-[140px]">
+             {isLimitReached ? (
+               'Limite Atingido'
+             ) : isLoading ? (
             {isLoading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
