@@ -9,6 +9,7 @@ export interface CreateAccountInput {
   nome: string;
   plano?: string;
   limiteUsuarios?: number;
+  monthlyExtractionLimit?: number;
   timezone?: string;
   chatwootBaseUrl?: string;
   chatwootAccountId?: string;
@@ -120,6 +121,7 @@ class AccountService {
         nome: input.nome,
         plano: input.plano,
         limiteUsuarios: input.limiteUsuarios ?? 10,
+        monthlyExtractionLimit: input.monthlyExtractionLimit ?? 500,
         timezone: input.timezone ?? 'America/Sao_Paulo',
         chatwootBaseUrl: input.chatwootBaseUrl,
         chatwootAccountId: input.chatwootAccountId,
@@ -165,6 +167,7 @@ class AccountService {
         nome: input.nome,
         plano: input.plano,
         limiteUsuarios: input.limiteUsuarios,
+        monthlyExtractionLimit: input.monthlyExtractionLimit,
         timezone: input.timezone,
         status: input.status,
         chatwootBaseUrl: input.chatwootBaseUrl,

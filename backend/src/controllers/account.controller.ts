@@ -9,6 +9,7 @@ const createAccountSchema = z.object({
   nome: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
   plano: z.string().optional(),
   limiteUsuarios: z.number().min(1).max(1000).optional(),
+  monthlyExtractionLimit: z.number().int().min(0).max(1000000).optional(),
   timezone: z.string().optional(),
   chatwootBaseUrl: z.string().url().optional(),
   chatwootAccountId: z.string().optional(),
