@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react';
+ import { useState, useCallback, useEffect } from 'react';
+ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { ExtractionSearchForm } from '@/components/extracao/ExtractionSearchForm';
 import { ExtractionResultsTable } from '@/components/extracao/ExtractionResultsTable';
@@ -23,20 +24,58 @@ export default function AdminExtracaoPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [dispatchOpen, setDispatchOpen] = useState(false);
   const [saveAudienceOpen, setSaveAudienceOpen] = useState(false);
-  const [usage, setUsage] = useState<ApiUsage | null>(null);
+   const [usage, setUsage] = useState<ApiUsage | null>(null);
+   
+   const fetchUsage = useCallback(async () => {
+     if (!account?.id) return;
+     
+     try {
+       // Use the helper function we created
+       const { data: usedCount, error: usageError } = await supabase.rpc('get_monthly_extraction_usage', {
+         p_account_id: account.id
+       });
+       
+       if (usageError) throw usageError;
+ 
+       // Get the account limit (already available in auth context, but let's refresh to be sure)
+       const { data: accountData, error: accountError } = await supabase
+         .from('accounts')
+         .select('monthly_extraction_limit')
+         .eq('id', account.id)
+         .single();
+         
+       if (accountError) throw accountError;
+       
+       setUsage({
+         used: usedCount || 0,
+         limit: accountData.monthly_extraction_limit || 100
+       });
+     } catch (err) {
+       console.error('Error fetching extraction usage:', err);
+     }
+   }, [account?.id]);
+ 
+   useEffect(() => {
+     fetchUsage();
+   }, [fetchUsage]);
   const [activeTab, setActiveTab] = useState('extracao');
   const [activeBatchId, setActiveBatchId] = useState<string | null>(null);
   const [extractionMeta, setExtractionMeta] = useState<{ keyword: string; location: string }>({ keyword: '', location: '' });
 
-  const handleSearchResults = useCallback(
-    (results: ExtractedLead[], apiUsage?: ApiUsage, meta?: { keyword: string; location: string }) => {
-      setLeads(results);
-      setSelectedIds(new Set(results.map((l) => l.id)));
-      if (apiUsage) setUsage(apiUsage);
-      if (meta) setExtractionMeta(meta);
-    },
-    []
-  );
+   const handleSearchResults = useCallback(
+     (results: ExtractedLead[], apiUsage?: ApiUsage, meta?: { keyword: string; location: string }) => {
+       setLeads(results);
+       setSelectedIds(new Set(results.map((l) => l.id)));
+       // If API usage is returned from the function call, use it, otherwise refresh
+       if (apiUsage) {
+         setUsage(apiUsage);
+       } else {
+         fetchUsage();
+       }
+       if (meta) setExtractionMeta(meta);
+     },
+     [fetchUsage]
+   );
 
   const handleToggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -84,8 +123,9 @@ export default function AdminExtracaoPage() {
     setActiveTab('disparos');
   }, []);
 
-  const selectedLeads = leads.filter((l) => selectedIds.has(l.id));
-  const usagePercent = usage ? Math.min((usage.used / usage.limit) * 100, 100) : 0;
+   const selectedLeads = leads.filter((l) => selectedIds.has(l.id));
+   const usagePercent = usage ? Math.min((usage.used / usage.limit) * 100, 100) : 0;
+   const isLimitReached = usage ? usage.used >= usage.limit : false;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
@@ -122,13 +162,14 @@ export default function AdminExtracaoPage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="extracao" className="space-y-4">
-          <ExtractionSearchForm
-            accountId={account?.id || ''}
-            onResults={handleSearchResults}
-            isLoading={isLoading}
-            setIsLoading={setIsLoading}
-          />
+         <TabsContent value="extracao" className="space-y-4">
+           <ExtractionSearchForm
+             accountId={account?.id || ''}
+             onResults={handleSearchResults}
+             isLoading={isLoading}
+             setIsLoading={setIsLoading}
+             isLimitReached={isLimitReached}
+           />
           {leads.length > 0 && (
             <>
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">

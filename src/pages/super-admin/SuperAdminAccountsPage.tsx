@@ -93,10 +93,11 @@ interface CreateFormData {
   chatwootEnabled: boolean;
   chatwootBaseUrl: string;
   chatwootAccountId: string;
-  chatwootApiKey: string;
-  openaiEnabled: boolean;
-  openaiApiKey: string;
-  sendgridEnabled: boolean;
+   chatwootApiKey: string;
+   monthly_extraction_limit: number;
+   openaiEnabled: boolean;
+   openaiApiKey: string;
+   sendgridEnabled: boolean;
   sendgridApiKey: string;
   sendgridFromEmail: string;
   sendgridFromName: string;
@@ -109,11 +110,12 @@ const initialFormData: CreateFormData = {
   limiteAgentes: 10,
   chatwootEnabled: false,
   chatwootBaseUrl: 'https://app.chatwoot.com',
-  chatwootAccountId: '',
-  chatwootApiKey: '',
-  openaiEnabled: false,
-  openaiApiKey: '',
-  sendgridEnabled: false,
+   chatwootAccountId: '',
+   chatwootApiKey: '',
+   monthly_extraction_limit: 100,
+   openaiEnabled: false,
+   openaiApiKey: '',
+   sendgridEnabled: false,
   sendgridApiKey: '',
   sendgridFromEmail: '',
   sendgridFromName: '',
@@ -234,10 +236,11 @@ export default function SuperAdminAccountsPage() {
       const newAccount = await accountsCloudOrBackend.create({
         nome: formData.nome,
         chatwoot_base_url: formData.chatwootEnabled ? formData.chatwootBaseUrl : undefined,
-        chatwoot_account_id: formData.chatwootEnabled ? formData.chatwootAccountId : undefined,
-        chatwoot_api_key: formData.chatwootEnabled ? formData.chatwootApiKey : undefined,
-        openai_api_key: formData.openaiEnabled ? formData.openaiApiKey : undefined,
-        sendgrid_api_key: formData.sendgridEnabled ? formData.sendgridApiKey : undefined,
+       chatwoot_account_id: formData.chatwootEnabled ? formData.chatwootAccountId : undefined,
+       chatwoot_api_key: formData.chatwootEnabled ? formData.chatwootApiKey : undefined,
+       monthly_extraction_limit: formData.monthly_extraction_limit,
+       openai_api_key: formData.openaiEnabled ? formData.openaiApiKey : undefined,
+       sendgrid_api_key: formData.sendgridEnabled ? formData.sendgridApiKey : undefined,
         sendgrid_from_email: formData.sendgridEnabled ? formData.sendgridFromEmail : undefined,
         sendgrid_from_name: formData.sendgridEnabled ? formData.sendgridFromName : undefined,
       });
@@ -275,10 +278,11 @@ export default function SuperAdminAccountsPage() {
       await accountsCloudOrBackend.create({
         nome: formData.nome,
         chatwoot_base_url: formData.chatwootEnabled ? formData.chatwootBaseUrl : undefined,
-        chatwoot_account_id: formData.chatwootEnabled ? formData.chatwootAccountId : undefined,
-        chatwoot_api_key: formData.chatwootEnabled ? formData.chatwootApiKey : undefined,
-        openai_api_key: formData.openaiEnabled ? formData.openaiApiKey : undefined,
-        sendgrid_api_key: formData.sendgridEnabled ? formData.sendgridApiKey : undefined,
+       chatwoot_account_id: formData.chatwootEnabled ? formData.chatwootAccountId : undefined,
+       chatwoot_api_key: formData.chatwootEnabled ? formData.chatwootApiKey : undefined,
+       monthly_extraction_limit: formData.monthly_extraction_limit,
+       openai_api_key: formData.openaiEnabled ? formData.openaiApiKey : undefined,
+       sendgrid_api_key: formData.sendgridEnabled ? formData.sendgridApiKey : undefined,
         sendgrid_from_email: formData.sendgridEnabled ? formData.sendgridFromEmail : undefined,
         sendgrid_from_name: formData.sendgridEnabled ? formData.sendgridFromName : undefined,
       });
@@ -403,10 +407,11 @@ export default function SuperAdminAccountsPage() {
         nome: editingAccount.nome,
         status: editingAccount.status,
         chatwoot_base_url: editingAccount.chatwoot_base_url,
-        chatwoot_account_id: editingAccount.chatwoot_account_id,
-        chatwoot_api_key: editingAccount.chatwoot_api_key,
-        openai_api_key: (editingAccount as any).openai_api_key,
-        sendgrid_api_key: (editingAccount as any).sendgrid_api_key,
+         chatwoot_account_id: editingAccount.chatwoot_account_id,
+         chatwoot_api_key: editingAccount.chatwoot_api_key,
+         monthly_extraction_limit: (editingAccount as any).monthly_extraction_limit,
+         openai_api_key: (editingAccount as any).openai_api_key,
+         sendgrid_api_key: (editingAccount as any).sendgrid_api_key,
         sendgrid_from_email: (editingAccount as any).sendgrid_from_email,
         sendgrid_from_name: (editingAccount as any).sendgrid_from_name,
       });
@@ -539,17 +544,31 @@ export default function SuperAdminAccountsPage() {
                     </Select>
                   </div>
 
-                  {/* Limite de Agentes */}
-                  <div className="space-y-2">
-                    <Label htmlFor="limite">Limite de Agentes</Label>
-                    <Input
-                      id="limite"
-                      type="number"
-                      value={formData.limiteAgentes}
-                      onChange={(e) => setFormData({ ...formData, limiteAgentes: parseInt(e.target.value) || 10 })}
-                      min={1}
-                    />
-                  </div>
+                   <div className="grid grid-cols-2 gap-4">
+                     {/* Limite de Agentes */}
+                     <div className="space-y-2">
+                       <Label htmlFor="limite">Limite de Agentes</Label>
+                       <Input
+                         id="limite"
+                         type="number"
+                         value={formData.limiteAgentes}
+                         onChange={(e) => setFormData({ ...formData, limiteAgentes: parseInt(e.target.value) || 10 })}
+                         min={1}
+                       />
+                     </div>
+
+                     {/* Limite de Extrações */}
+                     <div className="space-y-2">
+                       <Label htmlFor="limite_extracao">Limite de Extrações</Label>
+                       <Input
+                         id="limite_extracao"
+                         type="number"
+                         value={formData.monthly_extraction_limit}
+                         onChange={(e) => setFormData({ ...formData, monthly_extraction_limit: parseInt(e.target.value) || 0 })}
+                         min={0}
+                       />
+                     </div>
+                   </div>
 
                   {/* Nome - moved below for layout match */}
                   <div className="space-y-2">
@@ -1039,21 +1058,34 @@ export default function SuperAdminAccountsPage() {
                   onChange={(e) => setEditingAccount({ ...editingAccount, nome: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-status">Status</Label>
-                <Select
-                  value={editingAccount.status}
-                  onValueChange={(v) => setEditingAccount({ ...editingAccount, status: v as AccountStatus })}
-                >
-                  <SelectTrigger id="edit-status">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Ativa</SelectItem>
-                    <SelectItem value="paused">Pausada</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+               <div className="grid grid-cols-2 gap-4">
+                 <div className="space-y-2">
+                   <Label htmlFor="edit-status">Status</Label>
+                   <Select
+                     value={editingAccount.status}
+                     onValueChange={(v) => setEditingAccount({ ...editingAccount, status: v as AccountStatus })}
+                   >
+                     <SelectTrigger id="edit-status">
+                       <SelectValue />
+                     </SelectTrigger>
+                     <SelectContent>
+                       <SelectItem value="active">Ativa</SelectItem>
+                       <SelectItem value="paused">Pausada</SelectItem>
+                     </SelectContent>
+                   </Select>
+                 </div>
+
+                 <div className="space-y-2">
+                   <Label htmlFor="edit-limite-extracao">Limite de Extrações</Label>
+                   <Input
+                     id="edit-limite-extracao"
+                     type="number"
+                     value={(editingAccount as any).monthly_extraction_limit ?? 100}
+                     onChange={(e) => setEditingAccount({ ...editingAccount, monthly_extraction_limit: parseInt(e.target.value) || 0 } as any)}
+                     min={0}
+                   />
+                 </div>
+               </div>
 
               {/* Chatwoot Integration Section */}
               <div className="space-y-4 rounded-lg border p-4">
