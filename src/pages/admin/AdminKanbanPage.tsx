@@ -102,6 +102,8 @@ export default function AdminKanbanPage() {
 
   const isFirstTagsLoad = useRef(true);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const chatwootSyncRef = useRef<NodeJS.Timeout | null>(null);
+  const isChatwootSyncingRef = useRef(false);
 
   const accountId = user?.account_id || account?.id;
   
@@ -214,6 +216,44 @@ export default function AdminKanbanPage() {
       }
     };
   }, [accountId, fetchTagsData]);
+
+  // Heavy Chatwoot sync: pulls new contacts/conversations from Chatwoot every 5
+  // minutes. This is the slow call that previously froze the UI when running
+  // every 30s. By spacing it to 5min and running it silently in the background
+  // we still pick up new leads automatically without blocking interactions.
+  useEffect(() => {
+    if (!accountId || !hasChatwootConfig) return;
+
+    const runSilentChatwootSync = async () => {
+      if (isChatwootSyncingRef.current) return;
+      isChatwootSyncingRef.current = true;
+      try {
+        const result = await tagsService.syncChatwootContacts(accountId);
+        if (result?.success) {
+          const created = result.contacts_created || 0;
+          const updated = result.contacts_updated || 0;
+          const applied = result.lead_tags_applied || 0;
+          if (created > 0 || updated > 0 || applied > 0) {
+            // Silent refresh — no toasts, just update the board
+            await refetchContacts();
+            fetchTagsData(true);
+          }
+        }
+      } catch {
+        // Silent: background sync errors must never spam the UI
+      } finally {
+        isChatwootSyncingRef.current = false;
+      }
+    };
+
+    chatwootSyncRef.current = setInterval(runSilentChatwootSync, 5 * 60 * 1000);
+
+    return () => {
+      if (chatwootSyncRef.current) {
+        clearInterval(chatwootSyncRef.current);
+      }
+    };
+  }, [accountId, hasChatwootConfig, fetchTagsData, refetchContacts]);
 
   // Get stage tag for a lead
   const getLeadStageTag = useCallback((contactId: string): CloudTag | undefined => {
