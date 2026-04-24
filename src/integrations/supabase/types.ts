@@ -1528,6 +1528,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_monthly_extraction_usage: {
+        Args: { p_account_id: string }
+        Returns: number
+      }
       get_user_account_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
