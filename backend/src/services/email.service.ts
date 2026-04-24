@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, EmailSendStatus } from '@prisma/client';
 import { sendgridService } from './sendgrid.service';
 import { logger } from '../utils/logger';
 
@@ -13,7 +13,7 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 // Statuses considerados "envio que efetivamente saiu" (consomem cota).
 // 'queued' e 'failed' NÃO contam; respeitando a regra: cota só é consumida
 // quando o e-mail realmente foi entregue ao SendGrid com sucesso.
-const COUNTABLE_SEND_STATUSES = ['sent', 'delivered', 'opened', 'clicked', 'bounced'];
+const COUNTABLE_SEND_STATUSES: EmailSendStatus[] = ['sent', 'delivered', 'opened', 'clicked', 'bounced'] as EmailSendStatus[];
 
 /**
  * Retorna o início do dia atual no timezone informado (em UTC) e o início do próximo dia.
