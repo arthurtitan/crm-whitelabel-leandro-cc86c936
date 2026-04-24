@@ -3,6 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FolderOpen, Users } from 'lucide-react';
 import EmailCampaignsTab from '@/components/email/EmailCampaignsTab';
 import EmailAudiencesTab from '@/components/email/EmailAudiencesTab';
+import EmailQuotaCard from '@/components/email/EmailQuotaCard';
 
 export default function AdminEmailsPage() {
   return (
@@ -11,6 +12,8 @@ export default function AdminEmailsPage() {
         <h1 className="text-2xl font-bold text-foreground">E-mails</h1>
         <p className="text-muted-foreground">Automação de e-mails com campanhas, cadências e assistente IA</p>
       </div>
+
+      <EmailQuotaCard />
 
       <Tabs defaultValue="campaigns" className="w-full">
         <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
