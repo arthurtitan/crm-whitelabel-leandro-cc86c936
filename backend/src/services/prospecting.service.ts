@@ -81,9 +81,17 @@ class ProspectingService {
 
   /**
    * Extract leads from Google Maps via RapidAPI
+   *
+   * Estratégia robusta:
+   *  1) Geocoding da localização (para enriquecer a busca por proximidade).
+   *  2) Disparo PARALELO de 2 endpoints:
+   *     - searchmaps.php   → busca textual "{nicho} {localizacao}" (cobertura ampla)
+   *     - nearby.php       → busca por coordenadas (cobertura local densa)
+   *  3) Mescla + deduplicação por place_id / nome+telefone.
+   *  4) Conta uso apenas se houver leads.
    */
   async extractLeads(accountId: string, nicho: string, localizacao: string) {
-    const rapidApiKey = (env.RAPIDAPI_KEY || process.env.RAPIDAPI_KEY || '').trim();
+    const rapidApiKey = getRapidApiKey();
     if (!rapidApiKey) throw new Error('RAPIDAPI_KEY not configured');
 
     // Check monthly quota
@@ -112,29 +120,63 @@ class ProspectingService {
       );
     }
 
-    // Step 1: Geocoding
-    const geocodeUrl = `https://${RAPIDAPI_HOST}/geocoding.php?query=${encodeURIComponent(localizacao)}&country=br&lang=pt`;
-    const geocodeRes = await fetch(geocodeUrl, {
-      headers: { 'x-rapidapi-host': RAPIDAPI_HOST, 'x-rapidapi-key': rapidApiKey },
-    });
-    if (!geocodeRes.ok) throw new Error('Erro no geocoding. Verifique a localização.');
+    const headers = { 'x-rapidapi-host': RAPIDAPI_HOST, 'x-rapidapi-key': rapidApiKey };
 
-    const geocodeData = (await geocodeRes.json()) as GeocodingResponse;
-    if (!geocodeData.data?.lat || !geocodeData.data?.lng) {
-      throw Object.assign(new Error('Localização não encontrada. Tente outro endereço.'), { statusCode: 404 });
+    // ---------- Step 1: Geocoding (não-fatal) ----------
+    let lat: number | null = null;
+    let lng: number | null = null;
+    try {
+      const geocodeUrl = `https://${RAPIDAPI_HOST}/geocoding.php?query=${encodeURIComponent(localizacao)}&country=br&lang=pt`;
+      const geocodeRes = await fetch(geocodeUrl, { headers });
+      if (geocodeRes.ok) {
+        const geocodeData = (await geocodeRes.json()) as GeocodingResponse;
+        if (geocodeData.data?.lat && geocodeData.data?.lng) {
+          lat = geocodeData.data.lat;
+          lng = geocodeData.data.lng;
+        }
+      }
+    } catch (e) {
+      console.warn('[prospecting] geocoding failed (non-fatal):', (e as Error).message);
     }
 
-    const { lat, lng } = geocodeData.data;
+    // ---------- Step 2: Buscas paralelas ----------
+    const queries: Array<Promise<NearbyPlace[]>> = [];
 
-    // Step 2: Nearby search
-    const nearbyUrl = `https://${RAPIDAPI_HOST}/nearby.php?query=${encodeURIComponent(nicho)}&lat=${lat}&lng=${lng}&lang=pt&country=br`;
-    const nearbyRes = await fetch(nearbyUrl, {
-      headers: { 'x-rapidapi-host': RAPIDAPI_HOST, 'x-rapidapi-key': rapidApiKey },
-    });
-    if (!nearbyRes.ok) throw new Error('Erro na busca por estabelecimentos.');
+    // Busca textual ampla (sempre executada)
+    queries.push(
+      this.fetchPlaces(
+        `https://${RAPIDAPI_HOST}/searchmaps.php?query=${encodeURIComponent(`${nicho} ${localizacao}`)}&lang=pt&country=br`,
+        headers
+      )
+    );
 
-    const nearbyData = (await nearbyRes.json()) as NearbyResponse;
-    const places = nearbyData.data || [];
+    // Busca por proximidade (apenas se temos coordenadas)
+    if (lat !== null && lng !== null) {
+      queries.push(
+        this.fetchPlaces(
+          `https://${RAPIDAPI_HOST}/nearby.php?query=${encodeURIComponent(nicho)}&lat=${lat}&lng=${lng}&lang=pt&country=br`,
+          headers
+        )
+      );
+    }
+
+    const results = await Promise.all(queries);
+    const allPlaces = results.flat();
+
+    // ---------- Step 3: Deduplicação ----------
+    const seen = new Set<string>();
+    const places: NearbyPlace[] = [];
+    for (const p of allPlaces) {
+      const key = (p.place_id || `${(p.name || '').toLowerCase().trim()}|${p.phone_number || ''}`).trim();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      places.push(p);
+    }
+
+    console.log(
+      `[prospecting] nicho="${nicho}" loc="${localizacao}" ` +
+      `geo=${lat !== null ? 'ok' : 'no'} raw=${allPlaces.length} dedup=${places.length}`
+    );
 
     // Only count usage when leads are effectively returned to the user.
     // If no leads were returned, do NOT consume the user's monthly quota.
@@ -152,11 +194,11 @@ class ProspectingService {
       telefone: p.phone_number || '',
       site: p.website || '',
       avaliacao: p.rating || null,
-      total_avaliacoes: p.reviews || null,
+      total_avaliacoes: p.reviews ?? p.review_count ?? null,
       foto: p.photo || '',
       status_negocio: p.business_status || '',
       place_id: p.place_id || '',
-      google_maps_url: p.google_maps_url || '',
+      google_maps_url: p.google_maps_url || p.place_link || '',
     }));
 
     // Report usage in "extractions" (1 extraction = 2 raw requests)
@@ -167,6 +209,25 @@ class ProspectingService {
         limit,
       },
     };
+  }
+
+  /**
+   * Helper: chama um endpoint da Maps Data e retorna o array `data` (ou []).
+   * Erros são logados mas não propagam — assim uma fonte falhar não invalida a outra.
+   */
+  private async fetchPlaces(url: string, headers: Record<string, string>): Promise<NearbyPlace[]> {
+    try {
+      const res = await fetch(url, { headers });
+      if (!res.ok) {
+        console.warn(`[prospecting] fetch ${res.status} from ${url.split('?')[0]}`);
+        return [];
+      }
+      const json = (await res.json()) as NearbyResponse;
+      return json.data || [];
+    } catch (e) {
+      console.warn('[prospecting] fetchPlaces error:', (e as Error).message);
+      return [];
+    }
   }
 
   /**
