@@ -116,6 +116,19 @@ export class ProspectingController {
       next(error);
     }
   }
+
+  /**
+   * GET /api/prospecting/usage
+   * Returns current month extraction usage in "extractions" units (resets monthly).
+   */
+  async getUsage(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const usage = await prospectingService.getUsage(req.user!.accountId!);
+      res.json({ success: true, ...usage });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const prospectingController = new ProspectingController();
