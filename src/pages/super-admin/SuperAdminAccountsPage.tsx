@@ -95,6 +95,8 @@ interface CreateFormData {
   chatwootAccountId: string;
    chatwootApiKey: string;
    monthly_extraction_limit: number;
+   monthly_email_limit: number;
+   daily_email_limit: number;
    openaiEnabled: boolean;
    openaiApiKey: string;
    sendgridEnabled: boolean;
@@ -113,6 +115,8 @@ const initialFormData: CreateFormData = {
    chatwootAccountId: '',
    chatwootApiKey: '',
    monthly_extraction_limit: 100,
+   monthly_email_limit: 3000,
+   daily_email_limit: 100,
    openaiEnabled: false,
    openaiApiKey: '',
    sendgridEnabled: false,
@@ -239,6 +243,8 @@ export default function SuperAdminAccountsPage() {
        chatwoot_account_id: formData.chatwootEnabled ? formData.chatwootAccountId : undefined,
        chatwoot_api_key: formData.chatwootEnabled ? formData.chatwootApiKey : undefined,
        monthly_extraction_limit: formData.monthly_extraction_limit,
+       monthly_email_limit: formData.monthly_email_limit,
+       daily_email_limit: formData.daily_email_limit,
        openai_api_key: formData.openaiEnabled ? formData.openaiApiKey : undefined,
        sendgrid_api_key: formData.sendgridEnabled ? formData.sendgridApiKey : undefined,
         sendgrid_from_email: formData.sendgridEnabled ? formData.sendgridFromEmail : undefined,
@@ -281,6 +287,8 @@ export default function SuperAdminAccountsPage() {
        chatwoot_account_id: formData.chatwootEnabled ? formData.chatwootAccountId : undefined,
        chatwoot_api_key: formData.chatwootEnabled ? formData.chatwootApiKey : undefined,
        monthly_extraction_limit: formData.monthly_extraction_limit,
+       monthly_email_limit: formData.monthly_email_limit,
+       daily_email_limit: formData.daily_email_limit,
        openai_api_key: formData.openaiEnabled ? formData.openaiApiKey : undefined,
        sendgrid_api_key: formData.sendgridEnabled ? formData.sendgridApiKey : undefined,
         sendgrid_from_email: formData.sendgridEnabled ? formData.sendgridFromEmail : undefined,
@@ -410,6 +418,8 @@ export default function SuperAdminAccountsPage() {
          chatwoot_account_id: editingAccount.chatwoot_account_id,
          chatwoot_api_key: editingAccount.chatwoot_api_key,
          monthly_extraction_limit: (editingAccount as any).monthly_extraction_limit,
+        monthly_email_limit: (editingAccount as any).monthly_email_limit,
+        daily_email_limit: (editingAccount as any).daily_email_limit,
          openai_api_key: (editingAccount as any).openai_api_key,
          sendgrid_api_key: (editingAccount as any).sendgrid_api_key,
         sendgrid_from_email: (editingAccount as any).sendgrid_from_email,
@@ -567,6 +577,32 @@ export default function SuperAdminAccountsPage() {
                          onChange={(e) => setFormData({ ...formData, monthly_extraction_limit: parseInt(e.target.value) || 0 })}
                          min={0}
                        />
+                     </div>
+                   </div>
+
+                   {/* Limites de E-mail */}
+                   <div className="grid grid-cols-2 gap-4">
+                     <div className="space-y-2">
+                       <Label htmlFor="limite_email_mensal">Limite de E-mails (mês)</Label>
+                       <Input
+                         id="limite_email_mensal"
+                         type="number"
+                         value={formData.monthly_email_limit}
+                         onChange={(e) => setFormData({ ...formData, monthly_email_limit: parseInt(e.target.value) || 0 })}
+                         min={0}
+                       />
+                       <p className="text-xs text-muted-foreground">Padrão: 3.000 e-mails/mês</p>
+                     </div>
+                     <div className="space-y-2">
+                       <Label htmlFor="limite_email_diario">Limite de E-mails (dia)</Label>
+                       <Input
+                         id="limite_email_diario"
+                         type="number"
+                         value={formData.daily_email_limit}
+                         onChange={(e) => setFormData({ ...formData, daily_email_limit: parseInt(e.target.value) || 0 })}
+                         min={0}
+                       />
+                       <p className="text-xs text-muted-foreground">Padrão: 100 e-mails/dia</p>
                      </div>
                    </div>
 
@@ -1086,6 +1122,32 @@ export default function SuperAdminAccountsPage() {
                    />
                  </div>
                </div>
+
+              {/* Limites de E-mail */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-email-mensal">Limite de E-mails (mês)</Label>
+                  <Input
+                    id="edit-email-mensal"
+                    type="number"
+                    value={(editingAccount as any).monthly_email_limit ?? 3000}
+                    onChange={(e) => setEditingAccount({ ...editingAccount, monthly_email_limit: parseInt(e.target.value) || 0 } as any)}
+                    min={0}
+                  />
+                  <p className="text-xs text-muted-foreground">Padrão: 3.000/mês</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-email-diario">Limite de E-mails (dia)</Label>
+                  <Input
+                    id="edit-email-diario"
+                    type="number"
+                    value={(editingAccount as any).daily_email_limit ?? 100}
+                    onChange={(e) => setEditingAccount({ ...editingAccount, daily_email_limit: parseInt(e.target.value) || 0 } as any)}
+                    min={0}
+                  />
+                  <p className="text-xs text-muted-foreground">Padrão: 100/dia. Bloqueia se qualquer um dos dois limites estourar.</p>
+                </div>
+              </div>
 
               {/* Chatwoot Integration Section */}
               <div className="space-y-4 rounded-lg border p-4">

@@ -14,6 +14,8 @@ export interface Account {
   google_client_secret?: string | null;
    google_redirect_uri?: string | null;
    monthly_extraction_limit?: number;
+   monthly_email_limit?: number;
+   daily_email_limit?: number;
    openai_api_key?: string | null;
    sendgrid_api_key?: string | null;
    sendgrid_from_email?: string | null;
@@ -30,6 +32,8 @@ export interface CreateAccountInput {
   chatwoot_account_id?: string;
    chatwoot_api_key?: string;
    monthly_extraction_limit?: number;
+   monthly_email_limit?: number;
+   daily_email_limit?: number;
    openai_api_key?: string;
    sendgrid_api_key?: string;
    sendgrid_from_email?: string;
@@ -44,6 +48,8 @@ export interface UpdateAccountInput {
   chatwoot_account_id?: string;
    chatwoot_api_key?: string;
    monthly_extraction_limit?: number;
+   monthly_email_limit?: number;
+   daily_email_limit?: number;
    google_client_id?: string;
    google_client_secret?: string;
    google_redirect_uri?: string;

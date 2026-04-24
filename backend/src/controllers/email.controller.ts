@@ -224,6 +224,16 @@ export const emailController = {
     } catch (error) { next(error); }
   },
 
+  // ==================== QUOTA ====================
+
+  async getQuota(req: Request, res: Response, next: NextFunction) {
+    try {
+      const accountId = getAccountId(req);
+      const quota = await emailService.checkEmailQuota(accountId);
+      res.json(quota);
+    } catch (error) { next(error); }
+  },
+
   // ==================== AI ====================
 
   async generateEmail(req: Request, res: Response, next: NextFunction) {

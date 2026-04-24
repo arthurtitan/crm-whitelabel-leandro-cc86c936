@@ -10,6 +10,8 @@ const createAccountSchema = z.object({
   plano: z.string().optional(),
   limiteUsuarios: z.number().min(1).max(1000).optional(),
   monthlyExtractionLimit: z.number().int().min(0).max(1000000).optional(),
+  monthlyEmailLimit: z.number().int().min(0).max(10000000).optional(),
+  dailyEmailLimit: z.number().int().min(0).max(10000000).optional(),
   timezone: z.string().optional(),
   chatwootBaseUrl: z.string().url().optional(),
   chatwootAccountId: z.string().optional(),

@@ -21,6 +21,8 @@ model Account {
   status          AccountStatus @default(active)
   limiteUsuarios  Int           @default(10) @map("limite_usuarios")
   monthlyExtractionLimit Int?  @default(500) @map("monthly_extraction_limit")
+  monthlyEmailLimit      Int?  @default(3000) @map("monthly_email_limit")
+  dailyEmailLimit        Int?  @default(100)  @map("daily_email_limit")
 
   // Chatwoot Integration
   chatwootBaseUrl   String? @map("chatwoot_base_url") @db.VarChar(500)

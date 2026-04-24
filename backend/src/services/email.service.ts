@@ -7,6 +7,58 @@ const prisma = new PrismaClient();
 // Utility: delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+// ============================================
+// EMAIL QUOTA HELPERS (mensal + diário)
+// ============================================
+// Statuses considerados "envio que efetivamente saiu" (consomem cota).
+// 'queued' e 'failed' NÃO contam; respeitando a regra: cota só é consumida
+// quando o e-mail realmente foi entregue ao SendGrid com sucesso.
+const COUNTABLE_SEND_STATUSES = ['sent', 'delivered', 'opened', 'clicked', 'bounced'];
+
+/**
+ * Retorna o início do dia atual no timezone informado (em UTC) e o início do próximo dia.
+ */
+function getDailyWindow(timezone: string = 'America/Sao_Paulo'): { start: Date; resetAt: Date } {
+  const now = new Date();
+  // Pega a data local (YYYY-MM-DD) no timezone alvo
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  });
+  const localDate = fmt.format(now); // "2026-04-24"
+  // Pega o offset atual do timezone em minutos relativo ao UTC
+  const tzNow = new Date(now.toLocaleString('en-US', { timeZone: timezone }));
+  const utcNow = new Date(now.toLocaleString('en-US', { timeZone: 'UTC' }));
+  const offsetMs = tzNow.getTime() - utcNow.getTime();
+  // Início do dia local em UTC
+  const start = new Date(`${localDate}T00:00:00Z`);
+  start.setTime(start.getTime() - offsetMs);
+  const resetAt = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  return { start, resetAt };
+}
+
+/**
+ * Retorna o início do mês atual no timezone informado e o início do próximo mês.
+ */
+function getMonthlyWindow(timezone: string = 'America/Sao_Paulo'): { start: Date; resetAt: Date } {
+  const now = new Date();
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  });
+  const [year, month] = fmt.format(now).split('-').map(Number);
+  const tzNow = new Date(now.toLocaleString('en-US', { timeZone: timezone }));
+  const utcNow = new Date(now.toLocaleString('en-US', { timeZone: 'UTC' }));
+  const offsetMs = tzNow.getTime() - utcNow.getTime();
+  const start = new Date(`${year}-${String(month).padStart(2, '0')}-01T00:00:00Z`);
+  start.setTime(start.getTime() - offsetMs);
+  const nextMonth = month === 12 ? 1 : month + 1;
+  const nextYear = month === 12 ? year + 1 : year;
+  const resetAt = new Date(`${nextYear}-${String(nextMonth).padStart(2, '0')}-01T00:00:00Z`);
+  resetAt.setTime(resetAt.getTime() - offsetMs);
+  return { start, resetAt };
+}
+
 /**
  * Calculate nextSendAt based on startDate, dayNumber, and sendAtTime (HH:MM).
  * Day 1 = startDate, Day 2 = startDate + 1 day, etc.
@@ -69,6 +121,68 @@ async function withBackoff<T>(
 
 export const emailService = {
   // ==================== CADENCES ====================
+
+  // ==================== QUOTA ====================
+
+  /**
+   * Verifica a cota mensal e diária de envio de e-mails da conta.
+   * Retorna o uso atual, limite, restante e quando reseta.
+   * canSend = true apenas se AMBOS (mensal e diário) tiverem saldo > 0.
+   */
+  async checkEmailQuota(accountId: string) {
+    const account = await prisma.account.findUnique({
+      where: { id: accountId },
+      select: {
+        timezone: true,
+        monthlyEmailLimit: true,
+        dailyEmailLimit: true,
+      },
+    });
+
+    const tz = account?.timezone || 'America/Sao_Paulo';
+    const monthlyLimit = account?.monthlyEmailLimit ?? 3000;
+    const dailyLimit = account?.dailyEmailLimit ?? 100;
+
+    const { start: monthStart, resetAt: monthReset } = getMonthlyWindow(tz);
+    const { start: dayStart, resetAt: dayReset } = getDailyWindow(tz);
+
+    const [monthlyUsed, dailyUsed] = await Promise.all([
+      prisma.emailSend.count({
+        where: {
+          accountId,
+          status: { in: COUNTABLE_SEND_STATUSES },
+          createdAt: { gte: monthStart },
+        },
+      }),
+      prisma.emailSend.count({
+        where: {
+          accountId,
+          status: { in: COUNTABLE_SEND_STATUSES },
+          createdAt: { gte: dayStart },
+        },
+      }),
+    ]);
+
+    const monthlyRemaining = Math.max(0, monthlyLimit - monthlyUsed);
+    const dailyRemaining = Math.max(0, dailyLimit - dailyUsed);
+
+    return {
+      monthly: {
+        used: monthlyUsed,
+        limit: monthlyLimit,
+        remaining: monthlyRemaining,
+        resetAt: monthReset.toISOString(),
+      },
+      daily: {
+        used: dailyUsed,
+        limit: dailyLimit,
+        remaining: dailyRemaining,
+        resetAt: dayReset.toISOString(),
+      },
+      canSend: monthlyRemaining > 0 && dailyRemaining > 0,
+      timezone: tz,
+    };
+  },
 
   async listCadences(accountId: string) {
     return prisma.emailCadence.findMany({
@@ -443,7 +557,41 @@ export const emailService = {
         fromName: account.sendgridFromName || 'GoodLeads CRM',
       };
 
-      const batch = enrollments.slice(0, batchSize);
+      // ---- QUOTA CHECK (mensal + diário) ----
+      const quota = await this.checkEmailQuota(accountId);
+      if (!quota.canSend) {
+        const reason = quota.daily.remaining <= 0
+          ? `Limite diário (${quota.daily.limit}) atingido. Reset em ${new Date(quota.daily.resetAt).toLocaleString('pt-BR')}.`
+          : `Limite mensal (${quota.monthly.limit}) atingido. Reset em ${new Date(quota.monthly.resetAt).toLocaleString('pt-BR')}.`;
+        logger.warn(`[EmailProcessor] Quota esgotada para conta ${accountId}: ${reason}`);
+
+        // Reagenda enrollments para o próximo reset (diário ou mensal, o mais cedo)
+        const nextReset = new Date(Math.min(
+          new Date(quota.daily.resetAt).getTime(),
+          new Date(quota.monthly.resetAt).getTime(),
+        ));
+        await prisma.emailEnrollment.updateMany({
+          where: { id: { in: enrollments.map(e => e.id) } },
+          data: { nextSendAt: nextReset },
+        });
+        continue;
+      }
+
+      // Limita o lote ao MENOR entre: batchSize, restante diário e restante mensal
+      const allowedByQuota = Math.min(quota.daily.remaining, quota.monthly.remaining);
+      const effectiveBatchSize = Math.min(batchSize, allowedByQuota);
+      const batch = enrollments.slice(0, effectiveBatchSize);
+
+      // Reagenda os que ficaram fora do lote por causa da cota diária
+      if (enrollments.length > batch.length) {
+        const overflow = enrollments.slice(batch.length);
+        const dayResetAt = new Date(quota.daily.resetAt);
+        await prisma.emailEnrollment.updateMany({
+          where: { id: { in: overflow.map(e => e.id) } },
+          data: { nextSendAt: dayResetAt },
+        });
+        logger.info(`[EmailProcessor] ${overflow.length} envios reagendados para ${dayResetAt.toISOString()} (cota diária)`);
+      }
 
       for (const enrollment of batch) {
         try {
