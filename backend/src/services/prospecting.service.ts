@@ -89,9 +89,12 @@ class ProspectingService {
     // monthlyExtractionLimit may not exist on old Prisma schemas - default to 500
     const limit = (account as any)?.monthlyExtractionLimit ?? 500;
 
-    if (totalUsed >= limit) {
+    // `limit` is expressed in "extractions" (1 extraction = 2 raw API requests).
+    // Convert raw request counter to extractions before comparing with the limit.
+    const usedExtractions = Math.floor(totalUsed / 2);
+    if (usedExtractions >= limit) {
       throw Object.assign(
-        new Error(`Limite mensal atingido (${totalUsed}/${limit} requisições). Contate o administrador.`),
+        new Error(`Limite mensal atingido (${usedExtractions}/${limit} extrações). Contate o administrador.`),
         { statusCode: 429 }
       );
     }
