@@ -123,8 +123,9 @@ export default function AdminExtracaoPage() {
     setActiveTab('disparos');
   }, []);
 
-  const selectedLeads = leads.filter((l) => selectedIds.has(l.id));
-  const usagePercent = usage ? Math.min((usage.used / usage.limit) * 100, 100) : 0;
+   const selectedLeads = leads.filter((l) => selectedIds.has(l.id));
+   const usagePercent = usage ? Math.min((usage.used / usage.limit) * 100, 100) : 0;
+   const isLimitReached = usage ? usage.used >= usage.limit : false;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
@@ -161,13 +162,14 @@ export default function AdminExtracaoPage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="extracao" className="space-y-4">
-          <ExtractionSearchForm
-            accountId={account?.id || ''}
-            onResults={handleSearchResults}
-            isLoading={isLoading}
-            setIsLoading={setIsLoading}
-          />
+         <TabsContent value="extracao" className="space-y-4">
+           <ExtractionSearchForm
+             accountId={account?.id || ''}
+             onResults={handleSearchResults}
+             isLoading={isLoading}
+             setIsLoading={setIsLoading}
+             isLimitReached={isLimitReached}
+           />
           {leads.length > 0 && (
             <>
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
