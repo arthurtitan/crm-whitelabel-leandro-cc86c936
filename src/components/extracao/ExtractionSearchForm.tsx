@@ -120,18 +120,17 @@ import type { ExtractedLead, ApiUsage } from './types';
              {isLimitReached ? (
                'Limite Atingido'
              ) : isLoading ? (
-            {isLoading ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Buscando...
-              </>
-            ) : (
-              <>
-                <Search className="w-4 h-4 mr-2" />
-                Buscar Leads
-              </>
-            )}
-          </Button>
+               <>
+                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                 Buscando...
+               </>
+             ) : (
+               <>
+                 <Search className="w-4 h-4 mr-2" />
+                 Buscar Leads
+               </>
+             )}
+           </Button>
         </form>
       </CardContent>
     </Card>
