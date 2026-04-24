@@ -123,10 +123,14 @@ class ProspectingService {
     const nearbyData = (await nearbyRes.json()) as NearbyResponse;
     const places = nearbyData.data || [];
 
-    // Log usage (2 API calls)
-    await prisma.apiUsageLog.create({
-      data: { accountId, endpoint: 'maps-data', requestsCount: 2, month: currentMonth },
-    });
+    // Only count usage when leads are effectively returned to the user.
+    // If no leads were returned, do NOT consume the user's monthly quota.
+    const hasLeads = places.length > 0;
+    if (hasLeads) {
+      await prisma.apiUsageLog.create({
+        data: { accountId, endpoint: 'maps-data', requestsCount: 2, month: currentMonth },
+      });
+    }
 
     const leads = places.map((p) => ({
       nome: p.name || '',
@@ -146,7 +150,7 @@ class ProspectingService {
     return {
       leads,
       usage: {
-        used: Math.floor((totalUsed + 2) / 2),
+        used: Math.floor((totalUsed + (hasLeads ? 2 : 0)) / 2),
         limit,
       },
     };
