@@ -239,6 +239,16 @@ export const campaignService = {
 
     // Trigger immediate processing
     const { emailService } = await import('./email.service');
+
+    // Quota check: avisa (mas não bloqueia o enroll) se cota estourar
+    const quota = await emailService.checkEmailQuota(accountId);
+    if (!quota.canSend) {
+      const reason = quota.daily.remaining <= 0
+        ? `Limite diário de e-mails (${quota.daily.limit}) atingido. Os envios serão retomados após ${new Date(quota.daily.resetAt).toLocaleString('pt-BR')}.`
+        : `Limite mensal de e-mails (${quota.monthly.limit}) atingido. Os envios serão retomados após ${new Date(quota.monthly.resetAt).toLocaleString('pt-BR')}.`;
+      throw new Error(reason);
+    }
+
     const processed = await emailService.processCadenceQueue();
 
     return {
