@@ -56,11 +56,24 @@ async function bootstrap() {
   }));
 
   // Rate limiting
+  // Skip webhook endpoints (server-to-server calls from n8n / Chatwoot / SendGrid).
+  // These have their own auth (shared secret / signature) and must not be throttled
+  // by the per-IP limiter, otherwise bursts of automated events get rejected.
+  const WEBHOOK_PATH_PREFIXES = [
+    '/api/chatwoot/webhook',
+    '/api/chatwoot/log-resolution',
+    '/api/email/webhook',           // SendGrid event webhook (if used)
+    '/api/email/inbound',           // SendGrid inbound parse (if used)
+  ];
   const limiter = rateLimit({
     windowMs: env.RATE_LIMIT_WINDOW_MS,
     max: env.RATE_LIMIT_MAX,
     standardHeaders: true,
     legacyHeaders: false,
+    skip: (req) => {
+      const p = req.path || req.originalUrl || '';
+      return WEBHOOK_PATH_PREFIXES.some((prefix) => p.startsWith(prefix));
+    },
     message: {
       error: {
         code: 'RATE_LIMIT_EXCEEDED',
