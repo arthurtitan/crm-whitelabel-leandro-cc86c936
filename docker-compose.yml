@@ -70,7 +70,7 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-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}
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-https://goodleads.mychooice.com/api/calendar/google/callback}
       LOG_LEVEL: ${LOG_LEVEL:-info}
-      BUILD_VERSION: "2026-04-24-extraction-limits"
+      BUILD_VERSION: "2026-04-24-extraction-limits-v2"
       RUN_SEED: ${RUN_SEED:-true}
     expose:
       - "3000"
