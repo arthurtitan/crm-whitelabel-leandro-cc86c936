@@ -12,11 +12,12 @@ export interface Account {
   chatwoot_api_key: string | null;
   google_client_id?: string | null;
   google_client_secret?: string | null;
-  google_redirect_uri?: string | null;
-  openai_api_key?: string | null;
-  sendgrid_api_key?: string | null;
-  sendgrid_from_email?: string | null;
-  sendgrid_from_name?: string | null;
+   google_redirect_uri?: string | null;
+   monthly_extraction_limit?: number;
+   openai_api_key?: string | null;
+   sendgrid_api_key?: string | null;
+   sendgrid_from_email?: string | null;
+   sendgrid_from_name?: string | null;
   created_at: string;
   updated_at: string;
   users_count?: number;
@@ -27,11 +28,12 @@ export interface CreateAccountInput {
   plano?: string;
   chatwoot_base_url?: string;
   chatwoot_account_id?: string;
-  chatwoot_api_key?: string;
-  openai_api_key?: string;
-  sendgrid_api_key?: string;
-  sendgrid_from_email?: string;
-  sendgrid_from_name?: string;
+   chatwoot_api_key?: string;
+   monthly_extraction_limit?: number;
+   openai_api_key?: string;
+   sendgrid_api_key?: string;
+   sendgrid_from_email?: string;
+   sendgrid_from_name?: string;
 }
 
 export interface UpdateAccountInput {
@@ -40,14 +42,15 @@ export interface UpdateAccountInput {
   plano?: string;
   chatwoot_base_url?: string;
   chatwoot_account_id?: string;
-  chatwoot_api_key?: string;
-  google_client_id?: string;
-  google_client_secret?: string;
-  google_redirect_uri?: string;
-  openai_api_key?: string;
-  sendgrid_api_key?: string;
-  sendgrid_from_email?: string;
-  sendgrid_from_name?: string;
+   chatwoot_api_key?: string;
+   monthly_extraction_limit?: number;
+   google_client_id?: string;
+   google_client_secret?: string;
+   google_redirect_uri?: string;
+   openai_api_key?: string;
+   sendgrid_api_key?: string;
+   sendgrid_from_email?: string;
+   sendgrid_from_name?: string;
 }
 
 export const accountsCloudService = {
