@@ -178,7 +178,10 @@ export default function AdminKanbanPage() {
       isFirstTagsLoad.current = false;
     } catch (error) {
       console.error('Error fetching kanban data:', error);
-      if (isFirstTagsLoad.current) {
+      // Only show toast on first load failures — background refreshes fail silently
+      // to avoid spamming the user with "Erro ao carregar etapas" when the network
+      // hiccups or the backend rate-limits a polling call.
+      if (isFirstTagsLoad.current && !isBackground) {
         toast.error('Erro ao carregar etapas');
       }
     } finally {
@@ -192,48 +195,25 @@ export default function AdminKanbanPage() {
     fetchTagsData(false);
   }, [fetchTagsData]);
 
-  // Background sync with Chatwoot every 30 seconds
-  const performBackgroundSync = useCallback(async () => {
-    if (!accountId || !hasChatwootConfig || isFirstTagsLoad.current || isSyncingChatwoot) return;
-    
-    setIsSyncingTags(true);
-    try {
-      // Call the edge function to sync with Chatwoot (the real sync)
-      const result = await tagsService.syncChatwootContacts(accountId);
-      
-      if (result.success) {
-        const hasChanges = result.contacts_created > 0 || 
-                          result.contacts_updated > 0 || 
-                          result.lead_tags_applied > 0 || 
-                          (result.lead_tags_removed || 0) > 0;
-        
-        if (hasChanges) {
-          // Refresh data from database
-          await refetchContacts();
-          await fetchTagsData(true);
-          console.log('[Kanban Auto-Sync] Changes detected:', result);
-        }
-      }
-    } catch (error) {
-      console.error('[Kanban Auto-Sync] Error:', error);
-    } finally {
-      setIsSyncingTags(false);
-    }
-  }, [accountId, hasChatwootConfig, isSyncingChatwoot, refetchContacts, fetchTagsData]);
-
+  // Lightweight background refresh: only re-reads lead_tags + stage_tags from our
+  // own backend (NOT the heavy Chatwoot sync). Runs every 20s to pick up changes
+  // made by the AI / external workflows (e.g. n8n moving labels) without ever
+  // blocking the UI or hitting Chatwoot's rate limit.
   useEffect(() => {
-    if (!hasChatwootConfig) return;
-    
+    if (!accountId) return;
+
     pollingRef.current = setInterval(() => {
-      performBackgroundSync();
-    }, 30000);
+      if (isFirstTagsLoad.current) return;
+      // Background refresh — never shows error toasts (handled inside fetchTagsData)
+      fetchTagsData(true);
+    }, 20000);
 
     return () => {
       if (pollingRef.current) {
         clearInterval(pollingRef.current);
       }
     };
-  }, [performBackgroundSync, hasChatwootConfig]);
+  }, [accountId, fetchTagsData]);
 
   // Get stage tag for a lead
   const getLeadStageTag = useCallback((contactId: string): CloudTag | undefined => {
