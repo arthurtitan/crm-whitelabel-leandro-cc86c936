@@ -95,6 +95,8 @@ interface CreateFormData {
   chatwootAccountId: string;
    chatwootApiKey: string;
    monthly_extraction_limit: number;
+   monthly_email_limit: number;
+   daily_email_limit: number;
    openaiEnabled: boolean;
    openaiApiKey: string;
    sendgridEnabled: boolean;
@@ -113,6 +115,8 @@ const initialFormData: CreateFormData = {
    chatwootAccountId: '',
    chatwootApiKey: '',
    monthly_extraction_limit: 100,
+   monthly_email_limit: 3000,
+   daily_email_limit: 100,
    openaiEnabled: false,
    openaiApiKey: '',
    sendgridEnabled: false,
@@ -239,6 +243,8 @@ export default function SuperAdminAccountsPage() {
        chatwoot_account_id: formData.chatwootEnabled ? formData.chatwootAccountId : undefined,
        chatwoot_api_key: formData.chatwootEnabled ? formData.chatwootApiKey : undefined,
        monthly_extraction_limit: formData.monthly_extraction_limit,
+       monthly_email_limit: formData.monthly_email_limit,
+       daily_email_limit: formData.daily_email_limit,
        openai_api_key: formData.openaiEnabled ? formData.openaiApiKey : undefined,
        sendgrid_api_key: formData.sendgridEnabled ? formData.sendgridApiKey : undefined,
         sendgrid_from_email: formData.sendgridEnabled ? formData.sendgridFromEmail : undefined,
@@ -281,6 +287,8 @@ export default function SuperAdminAccountsPage() {
        chatwoot_account_id: formData.chatwootEnabled ? formData.chatwootAccountId : undefined,
        chatwoot_api_key: formData.chatwootEnabled ? formData.chatwootApiKey : undefined,
        monthly_extraction_limit: formData.monthly_extraction_limit,
+       monthly_email_limit: formData.monthly_email_limit,
+       daily_email_limit: formData.daily_email_limit,
        openai_api_key: formData.openaiEnabled ? formData.openaiApiKey : undefined,
        sendgrid_api_key: formData.sendgridEnabled ? formData.sendgridApiKey : undefined,
         sendgrid_from_email: formData.sendgridEnabled ? formData.sendgridFromEmail : undefined,
@@ -410,6 +418,8 @@ export default function SuperAdminAccountsPage() {
          chatwoot_account_id: editingAccount.chatwoot_account_id,
          chatwoot_api_key: editingAccount.chatwoot_api_key,
          monthly_extraction_limit: (editingAccount as any).monthly_extraction_limit,
+        monthly_email_limit: (editingAccount as any).monthly_email_limit,
+        daily_email_limit: (editingAccount as any).daily_email_limit,
          openai_api_key: (editingAccount as any).openai_api_key,
          sendgrid_api_key: (editingAccount as any).sendgrid_api_key,
         sendgrid_from_email: (editingAccount as any).sendgrid_from_email,
