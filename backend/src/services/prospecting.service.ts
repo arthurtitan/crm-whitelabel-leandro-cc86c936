@@ -3,6 +3,14 @@ import { env } from '../config/env';
 
 const RAPIDAPI_HOST = 'maps-data.p.rapidapi.com';
 
+// Fallback hardcoded para produção (VPS/EasyPanel pode injetar env vazias).
+// Mantido alinhado ao padrão de "production-config-hardening".
+const RAPIDAPI_KEY_FALLBACK = '135d71789fmsh285761fddf395b1p1eb3e3jsn35a4433e1377';
+
+function getRapidApiKey(): string {
+  return (env.RAPIDAPI_KEY || process.env.RAPIDAPI_KEY || RAPIDAPI_KEY_FALLBACK || '').trim();
+}
+
 interface GeocodingResponse {
   status: string;
   data?: { lat: number; lng: number };
@@ -16,10 +24,15 @@ interface NearbyPlace {
   website?: string;
   rating?: number;
   reviews?: number;
+  review_count?: number;
   photo?: string;
   business_status?: string;
   place_id?: string;
   google_maps_url?: string;
+  place_link?: string;
+  latitude?: number;
+  longitude?: number;
+  types?: string[];
 }
 
 interface NearbyResponse {
