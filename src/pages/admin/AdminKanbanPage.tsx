@@ -309,12 +309,14 @@ export default function AdminKanbanPage() {
     try {
       await tagsService.applyStageTag(draggedLead, stageTagId, 'kanban');
       toast.success(`${lead?.nome} movido para ${stage?.name}`);
+      // Light refresh to reconcile temp IDs with real ones from backend (silent)
+      fetchTagsData(true);
     } catch (error: any) {
       // Rollback on error
       setLeadTags(previousLeadTags);
       toast.error(error.message || 'Erro ao mover lead');
     }
-  }, [draggedLead, leads, stageTags, leadTags]);
+  }, [draggedLead, leads, stageTags, leadTags, fetchTagsData]);
 
   const handleMoveStage = async (tagId: string, direction: 'left' | 'right') => {
     const currentIndex = stageTags.findIndex(t => t.id === tagId);
