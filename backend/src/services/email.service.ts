@@ -557,7 +557,41 @@ export const emailService = {
         fromName: account.sendgridFromName || 'GoodLeads CRM',
       };
 
-      const batch = enrollments.slice(0, batchSize);
+      // ---- QUOTA CHECK (mensal + diário) ----
+      const quota = await this.checkEmailQuota(accountId);
+      if (!quota.canSend) {
+        const reason = quota.daily.remaining <= 0
+          ? `Limite diário (${quota.daily.limit}) atingido. Reset em ${new Date(quota.daily.resetAt).toLocaleString('pt-BR')}.`
+          : `Limite mensal (${quota.monthly.limit}) atingido. Reset em ${new Date(quota.monthly.resetAt).toLocaleString('pt-BR')}.`;
+        logger.warn(`[EmailProcessor] Quota esgotada para conta ${accountId}: ${reason}`);
+
+        // Reagenda enrollments para o próximo reset (diário ou mensal, o mais cedo)
+        const nextReset = new Date(Math.min(
+          new Date(quota.daily.resetAt).getTime(),
+          new Date(quota.monthly.resetAt).getTime(),
+        ));
+        await prisma.emailEnrollment.updateMany({
+          where: { id: { in: enrollments.map(e => e.id) } },
+          data: { nextSendAt: nextReset },
+        });
+        continue;
+      }
+
+      // Limita o lote ao MENOR entre: batchSize, restante diário e restante mensal
+      const allowedByQuota = Math.min(quota.daily.remaining, quota.monthly.remaining);
+      const effectiveBatchSize = Math.min(batchSize, allowedByQuota);
+      const batch = enrollments.slice(0, effectiveBatchSize);
+
+      // Reagenda os que ficaram fora do lote por causa da cota diária
+      if (enrollments.length > batch.length) {
+        const overflow = enrollments.slice(batch.length);
+        const dayResetAt = new Date(quota.daily.resetAt);
+        await prisma.emailEnrollment.updateMany({
+          where: { id: { in: overflow.map(e => e.id) } },
+          data: { nextSendAt: dayResetAt },
+        });
+        logger.info(`[EmailProcessor] ${overflow.length} envios reagendados para ${dayResetAt.toISOString()} (cota diária)`);
+      }
 
       for (const enrollment of batch) {
         try {
