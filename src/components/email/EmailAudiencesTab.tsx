@@ -190,6 +190,37 @@ const audienceApi = {
     const existingIds = new Set(excludeIds);
     return (data || []).filter((c: any) => !existingIds.has(c.id));
   },
+
+  async createContactByEmail(accountId: string, email: string, nome?: string): Promise<Contact> {
+    const cleanEmail = email.trim().toLowerCase();
+    const finalName = (nome && nome.trim()) || cleanEmail.split('@')[0];
+    if (useBackend) {
+      // Try to find existing contact first to avoid duplicates
+      const search = await apiClient.get<any>('/api/contacts', { params: { search: cleanEmail, limit: 5 } });
+      const searchData = search?.data ?? search;
+      const list = Array.isArray(searchData) ? searchData : (searchData?.data || []);
+      const existing = list.find((c: any) => (c.email || '').toLowerCase() === cleanEmail);
+      if (existing) return existing;
+      const res = await apiClient.post<any>(API_ENDPOINTS.CONTACTS.CREATE, { nome: finalName, email: cleanEmail });
+      const data = res?.data ?? res;
+      return data;
+    }
+    const { supabase } = await import('@/integrations/supabase/client');
+    const { data: existing } = await supabase
+      .from('contacts')
+      .select('id, nome, email, telefone')
+      .eq('account_id', accountId)
+      .ilike('email', cleanEmail)
+      .maybeSingle();
+    if (existing) return existing as Contact;
+    const { data, error } = await supabase
+      .from('contacts')
+      .insert({ account_id: accountId, nome: finalName, email: cleanEmail })
+      .select('id, nome, email, telefone')
+      .single();
+    if (error) throw error;
+    return data as Contact;
+  },
 };
 
 function normalizeAudience(a: any): Audience {
