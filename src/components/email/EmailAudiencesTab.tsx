@@ -361,6 +361,34 @@ export default function EmailAudiencesTab() {
     }
   };
 
+  const handleQuickAddByEmail = async () => {
+    if (!selectedAudience) return;
+    const email = contactSearch.trim().toLowerCase();
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    if (!isEmail) {
+      toast.error('Digite um e-mail válido');
+      return;
+    }
+    try {
+      const contact = await audienceApi.createContactByEmail(accountId, email);
+      // Avoid re-adding if already in audience
+      if (audienceContacts.some(c => c.id === contact.id)) {
+        toast.info('Este contato já está no público');
+        return;
+      }
+      await audienceApi.addContacts(selectedAudience.id, [contact.id]);
+      toast.success(`${email} adicionado ao público!`);
+      setShowAddContactsDialog(false);
+      setSelectedContactIds(new Set());
+      setContactSearch('');
+      setSearchResults([]);
+      loadAudienceContacts(selectedAudience.id);
+      loadAudiences();
+    } catch (err: any) {
+      toast.error(err?.message || 'Erro ao adicionar e-mail');
+    }
+  };
+
   const handleRemoveContact = async (contactId: string) => {
     if (!selectedAudience) return;
     try {
