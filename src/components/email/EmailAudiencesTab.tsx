@@ -601,14 +601,33 @@ export default function EmailAudiencesTab() {
               <Input
                 value={contactSearch}
                 onChange={e => handleSearchContacts(e.target.value)}
-                placeholder="Buscar por nome, email ou telefone..."
+                placeholder="Buscar por nome, e-mail ou telefone (ou digite um e-mail novo)..."
                 className="pl-9"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactSearch.trim())) {
+                    e.preventDefault();
+                    handleQuickAddByEmail();
+                  }
+                }}
               />
             </div>
             <div className="max-h-[300px] overflow-y-auto space-y-1">
               {searchLoading && <div className="flex justify-center py-4"><Loader2 className="w-4 h-4 animate-spin" /></div>}
               {!searchLoading && searchResults.length === 0 && contactSearch.length >= 2 && (
-                <p className="text-center text-sm text-muted-foreground py-4">Nenhum contato encontrado</p>
+                <div className="text-center py-4 space-y-3">
+                  <p className="text-sm text-muted-foreground">Nenhum contato encontrado</p>
+                  {/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactSearch.trim()) && (
+                    <Button size="sm" variant="outline" onClick={handleQuickAddByEmail}>
+                      <UserPlus className="w-4 h-4 mr-1" />
+                      Adicionar &quot;{contactSearch.trim()}&quot; como novo contato
+                    </Button>
+                  )}
+                </div>
+              )}
+              {!searchLoading && searchResults.length === 0 && contactSearch.length < 2 && (
+                <p className="text-center text-xs text-muted-foreground py-4">
+                  Digite pelo menos 2 caracteres para buscar, ou um e-mail completo para adicionar diretamente.
+                </p>
               )}
               {searchResults.map(c => (
                 <label key={c.id} className="flex items-center gap-3 p-2 rounded hover:bg-muted/30 cursor-pointer">
@@ -632,9 +651,15 @@ export default function EmailAudiencesTab() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddContactsDialog(false)}>Cancelar</Button>
+            {searchResults.length === 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactSearch.trim()) ? (
+              <Button onClick={handleQuickAddByEmail}>
+                <UserPlus className="w-4 h-4 mr-1" /> Adicionar e-mail
+              </Button>
+            ) : (
             <Button onClick={handleAddContacts} disabled={selectedContactIds.size === 0}>
               Adicionar {selectedContactIds.size > 0 ? `(${selectedContactIds.size})` : ''}
             </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
