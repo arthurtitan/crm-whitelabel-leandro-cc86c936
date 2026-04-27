@@ -422,7 +422,13 @@ export default function EmailCampaignsTab() {
         ` • ${result.processed} e-mail(s) processados agora`,
         { duration: 6000 },
       );
-      await loadData();
+      // Atualiza apenas as métricas da campanha disparada — não recarrega o mundo todo,
+      // o que zerava visualmente os outros KPIs durante o fetch.
+      try {
+        const stats = await emailService.getCampaignStats(selectedCampaign.id);
+        setCampaigns(prev => prev.map(c => c.id === selectedCampaign.id ? { ...c, stats: { ...stats } } : c));
+        setSelectedCampaign(prev => prev ? { ...prev, stats: { ...stats } } : prev);
+      } catch { /* não crítico */ }
     } catch (err: any) {
       toast.error(friendlyEmailError(err, 'Erro ao disparar campanha'));
     } finally {
