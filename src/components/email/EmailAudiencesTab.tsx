@@ -356,7 +356,7 @@ export default function EmailAudiencesTab() {
       setAudiences(prev => prev.filter(a => a.id !== deleteId));
       setDeleteId(null);
     } catch (err: any) {
-      toast.error(err?.message || 'Erro ao excluir público');
+      toast.error(friendlyEmailError(err, 'Erro ao excluir público'));
     }
   };
 
@@ -388,7 +388,7 @@ export default function EmailAudiencesTab() {
       loadAudienceContacts(selectedAudience.id);
       loadAudiences();
     } catch (err: any) {
-      toast.error(err?.message || 'Erro ao adicionar contatos');
+      toast.error(friendlyEmailError(err, 'Erro ao adicionar contatos'));
     }
   };
 
@@ -416,7 +416,7 @@ export default function EmailAudiencesTab() {
       loadAudienceContacts(selectedAudience.id);
       loadAudiences();
     } catch (err: any) {
-      toast.error(err?.message || 'Erro ao adicionar e-mail');
+      toast.error(friendlyEmailError(err, 'Erro ao adicionar e-mail'));
     }
   };
 
@@ -428,7 +428,7 @@ export default function EmailAudiencesTab() {
       loadAudienceContacts(selectedAudience.id);
       loadAudiences();
     } catch (err: any) {
-      toast.error(err?.message || 'Erro');
+      toast.error(friendlyEmailError(err, 'Erro'));
     }
   };
 
@@ -466,7 +466,7 @@ export default function EmailAudiencesTab() {
       loadAudienceContacts(selectedAudience.id);
       loadAudiences();
     } catch (err: any) {
-      toast.error(err?.message || 'Erro na importação');
+      toast.error(friendlyEmailError(err, 'Erro na importação'));
     } finally {
       setImportLoading(false);
     }
