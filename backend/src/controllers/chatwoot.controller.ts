@@ -807,6 +807,53 @@ async function handleContactUpdated(accountId: string, event: ChatwootWebhookEve
         email: event.contact.email?.toLowerCase() || contact.email,
       },
     });
+
+    try {
+      const rawLabels = await chatwootService.getContactLabels(accountId, event.contact.id);
+      const normalizeKey = (value: string) =>
+        value
+          .toString()
+          .trim()
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[\s_]+/g, '-')
+          .replace(/[^a-z0-9-]+/g, '')
+          .replace(/-+/g, '-')
+          .replace(/^-+|-+$/g, '');
+
+      const incomingKeys = Array.from(new Set(rawLabels.map((s) => normalizeKey(s)).filter(Boolean)));
+      const stageTags = await prisma.tag.findMany({
+        where: { accountId, type: 'stage', ativo: true },
+      });
+
+      const targetTag = stageTags.find((tag) => {
+        const candidates = [tag.slug, tag.name].filter(Boolean) as string[];
+        return candidates.some((candidate) => incomingKeys.includes(normalizeKey(candidate)));
+      });
+
+      if (targetTag) {
+        const currentStage = await prisma.leadTag.findFirst({
+          where: { contactId: contact.id, tag: { type: 'stage' } },
+          select: { tagId: true },
+        });
+
+        if (currentStage?.tagId !== targetTag.id) {
+          await contactService.applyTag(contact.id, accountId, targetTag.id, 'chatwoot');
+          logger.info('Lead moved via Chatwoot contact label', {
+            contactId: contact.id,
+            chatwootContactId: event.contact.id,
+            tagId: targetTag.id,
+            tagSlug: targetTag.slug,
+          });
+        }
+      }
+    } catch (err) {
+      logger.warn('Failed to sync stage from contact_updated webhook', {
+        chatwootContactId: event.contact.id,
+        error: (err as any)?.message,
+      });
+    }
   }
 }
 
