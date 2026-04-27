@@ -583,9 +583,30 @@ async function handleConversationCreated(accountId: string, event: ChatwootWebho
 async function handleConversationUpdated(accountId: string, event: ChatwootWebhookEvent) {
   if (!event.conversation) return;
 
-  // Check if labels were changed
-  const labels = event.conversation.labels || [];
-  
+  // Normalize incoming labels: Chatwoot returns slugs (e.g. "em-atendimento"),
+  // sometimes objects ({ title }), occasionally with underscores or display names.
+  const rawLabels = event.conversation.labels || [];
+  const normalizeKey = (value: string) =>
+    value
+      .toString()
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[\s_]+/g, '-')
+      .replace(/[^a-z0-9-]+/g, '')
+      .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
+  const incomingKeys = Array.from(
+    new Set(
+      rawLabels
+        .map((l: any) => (typeof l === 'string' ? l : l?.title || l?.name || ''))
+        .map((s: string) => normalizeKey(s))
+        .filter(Boolean)
+    )
+  );
+
   // Find the contact
   const contact = await prisma.contact.findFirst({
     where: {
@@ -597,35 +618,60 @@ async function handleConversationUpdated(accountId: string, event: ChatwootWebho
   if (!contact) {
     logger.debug('Contact not found for conversation update', {
       conversationId: event.conversation.id,
+      incomingKeys,
     });
     return;
   }
 
-  // Get all stage tags that match the labels
-  const matchingTags = await prisma.tag.findMany({
-    where: {
-      accountId,
-      type: 'stage',
-      name: { in: labels },
-    },
+  // Load every stage tag of this account and match by normalized slug/name.
+  // The Chatwoot label title is created from tag.slug (e.g. "em-atendimento"),
+  // so matching by tag.name would never succeed.
+  const stageTags = await prisma.tag.findMany({
+    where: { accountId, type: 'stage' },
   });
 
-  // Apply the first matching stage tag (Kanban only allows one stage)
-  if (matchingTags.length > 0) {
-    const targetTag = matchingTags[0];
-    
-    await contactService.applyTag(
-      contact.id,
-      accountId,
-      targetTag.id,
-      'chatwoot'
-    );
+  const matchingTags = stageTags.filter((tag) => {
+    const candidates = [tag.slug, tag.name].filter(Boolean) as string[];
+    return candidates.some((c) => incomingKeys.includes(normalizeKey(c)));
+  });
 
-    logger.info('Lead moved via Chatwoot label', {
+  if (matchingTags.length === 0) {
+    logger.info('Conversation updated but no matching stage tag found', {
+      conversationId: event.conversation.id,
       contactId: contact.id,
-      tagId: targetTag.id,
-      tagName: targetTag.name,
+      incomingKeys,
+      knownStages: stageTags.map((t) => ({ slug: t.slug, name: t.name })),
     });
+  } else {
+    // Apply the first matching stage tag (Kanban only allows one stage)
+    const targetTag = matchingTags[0];
+
+    // Skip if already on this stage to avoid noisy history entries
+    const currentStage = await prisma.leadTag.findFirst({
+      where: { contactId: contact.id, tag: { type: 'stage' } },
+      include: { tag: true },
+    });
+
+    if (currentStage?.tagId !== targetTag.id) {
+      await contactService.applyTag(
+        contact.id,
+        accountId,
+        targetTag.id,
+        'chatwoot'
+      );
+
+      logger.info('Lead moved via Chatwoot label', {
+        contactId: contact.id,
+        tagId: targetTag.id,
+        tagSlug: targetTag.slug,
+        from: currentStage?.tag?.slug || null,
+      });
+    } else {
+      logger.debug('Stage already current, skipping move', {
+        contactId: contact.id,
+        tagSlug: targetTag.slug,
+      });
+    }
   }
 
   // Record event
@@ -638,7 +684,8 @@ async function handleConversationUpdated(accountId: string, event: ChatwootWebho
     channel: 'chatwoot',
     payload: {
       conversationId: event.conversation.id,
-      labels,
+      labels: rawLabels,
+      incomingKeys,
     },
   });
 }
