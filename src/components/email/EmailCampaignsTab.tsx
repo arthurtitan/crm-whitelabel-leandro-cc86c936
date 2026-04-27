@@ -44,6 +44,20 @@ import StepRecipientsPanel from '@/components/email/StepRecipientsPanel';
 import { apiClient } from '@/api/client';
 import { API_ENDPOINTS } from '@/api/endpoints';
 
+// Map low-level errors (HTTP 429, network, etc.) to clear user-facing messages
+// so the UI never silently swallows a failed save.
+function friendlyEmailError(err: any, fallback: string): string {
+  const status = err?.status ?? err?.response?.status;
+  const code = err?.code ?? err?.response?.data?.error?.code;
+  if (status === 429 || code === 'RATE_LIMIT_EXCEEDED') {
+    return 'O servidor recebeu muitas requisições simultâneas. Aguarde alguns segundos e tente novamente.';
+  }
+  if (status === 401 || status === 403) {
+    return 'Sessão expirada ou sem permissão. Faça login novamente.';
+  }
+  return err?.message || fallback;
+}
+
 interface Audience {
   id: string;
   name: string;
@@ -218,20 +232,41 @@ export default function EmailCampaignsTab() {
         audienceId: form.audienceId || null,
       };
 
+      const emptyStats = { total: 0, sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, failed: 0, enrollments: 0 };
+
       if (editingCampaign) {
-        await emailService.updateCampaign(editingCampaign.id, payload);
+        const updated: any = await emailService.updateCampaign(editingCampaign.id, payload);
+        const audience = payload.audienceId ? audiences.find(a => a.id === payload.audienceId) || null : null;
+        // Optimistic local update — avoid re-fetching the entire dashboard
+        // (which used to fan out into N parallel requests and trip the limiter).
+        setCampaigns(prev => prev.map(c => c.id === editingCampaign.id
+          ? { ...c, ...updated, audience_id: payload.audienceId, audience }
+          : c));
+        if (selectedCampaign?.id === editingCampaign.id) {
+          setSelectedCampaign(prev => prev ? { ...prev, ...updated, audience_id: payload.audienceId, audience } : prev);
+        }
         toast.success('Campanha atualizada!');
       } else {
-        const created = await emailService.createCampaign(payload);
+        const created: any = await emailService.createCampaign(payload);
+        const audience = payload.audienceId ? audiences.find(a => a.id === payload.audienceId) || null : null;
+        const enriched: CampaignFull = {
+          ...created,
+          audience_id: payload.audienceId,
+          audience,
+          linkedCadences: [],
+          stats: { ...emptyStats },
+        };
+        setCampaigns(prev => [enriched, ...prev]);
         selectedCampaignIdRef.current = created.id;
+        setSelectedCampaign(enriched);
+        setSelectedCadence(null);
         toast.success('Campanha criada!');
       }
       setShowCreateDialog(false);
       setEditingCampaign(null);
       setForm({ name: '', description: '', audienceId: '' });
-      await loadData();
     } catch (err: any) {
-      toast.error(err?.message || 'Erro ao salvar campanha');
+      toast.error(friendlyEmailError(err, 'Erro ao salvar campanha'));
     }
   };
 
