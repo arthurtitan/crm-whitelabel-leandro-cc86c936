@@ -279,7 +279,7 @@ export default function EmailCampaignsTab() {
       setCampaigns(prev => prev.filter(c => c.id !== deleteId));
       setDeleteId(null);
     } catch (err: any) {
-      toast.error(err?.message || 'Erro ao excluir');
+      toast.error(friendlyEmailError(err, 'Erro ao excluir'));
     }
   };
 
@@ -305,7 +305,7 @@ export default function EmailCampaignsTab() {
       setEditingCadence(null);
       await loadData();
     } catch (err: any) {
-      toast.error(err?.message || 'Erro ao salvar cadência');
+      toast.error(friendlyEmailError(err, 'Erro ao salvar cadência'));
     }
   };
 
@@ -316,7 +316,7 @@ export default function EmailCampaignsTab() {
       toast.success('Cadência excluída!');
       await loadData();
     } catch (err: any) {
-      toast.error(err?.message || 'Erro ao excluir');
+      toast.error(friendlyEmailError(err, 'Erro ao excluir'));
     }
   };
 
@@ -337,7 +337,7 @@ export default function EmailCampaignsTab() {
       setShowStepAI(false);
       await loadData();
     } catch (err: any) {
-      toast.error(err?.message || 'Erro ao salvar step');
+      toast.error(friendlyEmailError(err, 'Erro ao salvar step'));
     }
   };
 
@@ -347,7 +347,7 @@ export default function EmailCampaignsTab() {
       toast.success('Step excluído!');
       await loadData();
     } catch (err: any) {
-      toast.error(err?.message || 'Erro ao excluir');
+      toast.error(friendlyEmailError(err, 'Erro ao excluir'));
     }
   };
 
@@ -361,7 +361,7 @@ export default function EmailCampaignsTab() {
       setRuleForm({ triggerEvent: 'opened', targetCadenceId: '', delayHours: 0, timeoutHours: 48 });
       await loadData();
     } catch (err: any) {
-      toast.error(err?.message || 'Erro ao criar regra');
+      toast.error(friendlyEmailError(err, 'Erro ao criar regra'));
     }
   };
 
@@ -371,7 +371,7 @@ export default function EmailCampaignsTab() {
       toast.success('Regra excluída!');
       await loadData();
     } catch (err: any) {
-      toast.error(err?.message || 'Erro');
+      toast.error(friendlyEmailError(err, 'Erro'));
     }
   };
 
@@ -399,7 +399,7 @@ export default function EmailCampaignsTab() {
       );
       await loadData();
     } catch (err: any) {
-      toast.error(err?.message || 'Erro ao disparar campanha');
+      toast.error(friendlyEmailError(err, 'Erro ao disparar campanha'));
     } finally {
       setDispatching(false);
     }
@@ -425,7 +425,7 @@ export default function EmailCampaignsTab() {
       toast.success('Template atualizado! Próximos envios usarão a versão nova.');
       setEditingTemplate(null);
     } catch (err: any) {
-      toast.error(err?.message || 'Erro ao salvar template');
+      toast.error(friendlyEmailError(err, 'Erro ao salvar template'));
     } finally {
       setSavingTemplate(false);
     }
