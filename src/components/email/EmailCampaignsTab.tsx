@@ -164,15 +164,18 @@ export default function EmailCampaignsTab() {
       }
       setAudiences(audWithCounts);
 
-      // Enrich campaigns
-      const enriched: CampaignFull[] = await Promise.all(campaignsData.map(async (camp: any) => {
+      // Enrich campaigns WITHOUT firing one stats request per campaign.
+      // The dashboard previously triggered N extra HTTP calls on every load
+      // (one per campaign), which combined with templates/audiences/cadences
+      // easily blew through any sensible per-IP rate limit. Stats are now
+      // fetched lazily for the currently selected campaign only.
+      const emptyStats = { total: 0, sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, failed: 0, enrollments: 0 };
+      const enriched: CampaignFull[] = campaignsData.map((camp: any) => {
         const linked = cadencesData.filter((c: any) => c.campaign_id === camp.id);
         const audienceId = camp.audience_id ?? camp.audience?.id ?? null;
         const audience = audienceId ? audWithCounts.find(a => a.id === audienceId) || null : null;
-        let stats = { total: 0, sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, failed: 0, enrollments: 0 };
-        try { stats = await emailService.getCampaignStats(camp.id); } catch {}
-        return { ...camp, audience_id: audienceId, linkedCadences: linked, audience, stats };
-      }));
+        return { ...camp, audience_id: audienceId, linkedCadences: linked, audience, stats: { ...emptyStats } };
+      });
 
       setCampaigns(enriched);
       setTemplates(templatesData);
@@ -188,6 +191,12 @@ export default function EmailCampaignsTab() {
           || nextCampaign.linkedCadences?.[0]
           || null;
         setSelectedCadence(nextCadence);
+        // Lazy-load stats for the active campaign only.
+        emailService.getCampaignStats(nextCampaign.id)
+          .then((stats) => {
+            setCampaigns(prev => prev.map(c => c.id === nextCampaign.id ? { ...c, stats: { ...stats } } : c));
+          })
+          .catch(() => { /* stats are non-critical */ });
       } else {
         setSelectedCadence(null);
       }
