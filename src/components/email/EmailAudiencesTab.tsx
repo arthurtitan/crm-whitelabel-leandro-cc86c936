@@ -18,6 +18,18 @@ import { useBackend } from '@/config/backend.config';
 import { apiClient } from '@/api/client';
 import { API_ENDPOINTS } from '@/api/endpoints';
 
+function friendlyEmailError(err: any, fallback: string): string {
+  const status = err?.status ?? err?.response?.status;
+  const code = err?.code ?? err?.response?.data?.error?.code;
+  if (status === 429 || code === 'RATE_LIMIT_EXCEEDED') {
+    return 'O servidor recebeu muitas requisições simultâneas. Aguarde alguns segundos e tente novamente.';
+  }
+  if (status === 401 || status === 403) {
+    return 'Sessão expirada ou sem permissão. Faça login novamente.';
+  }
+  return err?.message || fallback;
+}
+
 interface Audience {
   id: string;
   account_id?: string;
@@ -309,18 +321,29 @@ export default function EmailAudiencesTab() {
   const handleSave = async () => {
     try {
       if (editingAudience) {
-        await audienceApi.update(editingAudience.id, form);
+        const updated = await audienceApi.update(editingAudience.id, form);
+        // Optimistic local update — no full refetch (which would fan out into
+        // dozens of GETs and could trip the rate limiter).
+        setAudiences(prev => prev.map(a => a.id === editingAudience.id
+          ? { ...a, ...updated, contact_count: a.contact_count }
+          : a));
+        if (selectedAudience?.id === editingAudience.id) {
+          setSelectedAudience(prev => prev ? { ...prev, ...updated, contact_count: prev.contact_count } : prev);
+        }
         toast.success('Público atualizado!');
       } else {
-        await audienceApi.create(accountId, form);
+        const created = await audienceApi.create(accountId, form);
+        const next = { ...created, contact_count: created.contact_count ?? 0 };
+        setAudiences(prev => [next, ...prev]);
+        // Auto-select if it's the first one
+        setSelectedAudience(prev => prev ?? next);
         toast.success('Público criado!');
       }
       setShowCreateDialog(false);
       setEditingAudience(null);
       setForm({ name: '', description: '' });
-      await loadAudiences();
     } catch (err: any) {
-      toast.error(err?.message || 'Erro ao salvar público');
+      toast.error(friendlyEmailError(err, 'Erro ao salvar público'));
     }
   };
 
