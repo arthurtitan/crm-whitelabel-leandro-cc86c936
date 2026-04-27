@@ -788,25 +788,48 @@ class ChatwootService {
         }
 
         // Match conversation labels to stage tags
-        const labels: string[] = conv.labels || [];
-        if (labels.length > 0) {
-          for (const label of labels) {
+        // 1) Labels da conversa (caminho preferido)
+        const conversationLabels: string[] = Array.isArray(conv.labels) ? conv.labels : [];
+
+        // 2) Fallback/merge: labels aplicadas no contato em si.
+        // O n8n pode aplicar labels via /contacts/:id/labels ao invés de
+        // /conversations/:id/labels — sem isso o sync nunca enxergaria a etapa.
+        let contactLabels: string[] = [];
+        try {
+          const contactLabelsResp = await this.makeRequest<{ payload?: string[] } | string[]>(
+            config,
+            `/contacts/${sender.id}/labels`
+          );
+          contactLabels = Array.isArray(contactLabelsResp)
+            ? (contactLabelsResp as string[])
+            : ((contactLabelsResp as { payload?: string[] })?.payload || []);
+        } catch (err) {
+          logger.debug('[SyncContacts] Failed to fetch contact labels', {
+            chatwootContactId: sender.id,
+            error: (err as any)?.message,
+          });
+        }
+
+        // Mesclar mantendo ordem: conversa primeiro (mais específica), depois contato
+        const mergedLabels = Array.from(new Set([...conversationLabels, ...contactLabels]));
+
+        if (mergedLabels.length > 0) {
+          for (const label of mergedLabels) {
             const normalized = normalize(label);
             const matchedTag = tagBySlug.get(label) 
               || tagByNormalizedSlug.get(normalized) 
               || tagByName.get(label.toLowerCase().replace(/-/g, ' '));
             if (matchedTag) {
-              // Check if already has this tag
-              const existing = await prisma.leadTag.findUnique({
-                where: { contactId_tagId: { contactId: contact.id, tagId: matchedTag.id } },
+              // Verificar etapa atual do lead. Só atualiza se for diferente.
+              const currentStageTag = await prisma.leadTag.findFirst({
+                where: { contactId: contact.id, tag: { type: 'stage' } },
+                select: { tagId: true },
               });
-              if (!existing) {
-                // Remove other stage tags first
+
+              if (currentStageTag?.tagId !== matchedTag.id) {
+                // Trocar etapa: remove a antiga e aplica a nova
                 await prisma.leadTag.deleteMany({
-                  where: {
-                    contactId: contact.id,
-                    tag: { type: 'stage' },
-                  },
+                  where: { contactId: contact.id, tag: { type: 'stage' } },
                 });
                 await prisma.leadTag.create({
                   data: {
@@ -817,6 +840,14 @@ class ChatwootService {
                   },
                 });
                 leadTagsApplied++;
+                logger.info('[SyncContacts] Stage updated from Chatwoot label', {
+                  contactId: contact.id,
+                  chatwootContactId: sender.id,
+                  conversationId: conv.id,
+                  label,
+                  newStageTagId: matchedTag.id,
+                  source: conversationLabels.includes(label) ? 'conversation' : 'contact',
+                });
               }
               break; // Only one stage tag
             }
