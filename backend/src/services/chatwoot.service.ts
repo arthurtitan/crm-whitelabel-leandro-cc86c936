@@ -17,6 +17,7 @@ import {
   ChatwootReportMetrics,
   ChatwootAccountMetrics,
 } from '../types/chatwoot.types';
+import { normalizeStageKey, resolveLatestStageTagFromLabels } from '../utils/chatwoot-stage.util';
 
 class ChatwootService {
   // ============================================
@@ -785,11 +786,11 @@ class ChatwootService {
     const stageTags = await prisma.tag.findMany({
       where: { accountId, type: 'stage', ativo: true },
     });
-    const tagBySlug = new Map(stageTags.map(t => [t.slug, t]));
-    const tagByName = new Map(stageTags.map(t => [t.name.toLowerCase(), t]));
-    // Normalized map: convert hyphens to underscores for Chatwoot label compatibility
-    const normalize = (s: string) => s.toLowerCase().replace(/-/g, '_');
-    const tagByNormalizedSlug = new Map(stageTags.map(t => [normalize(t.slug), t]));
+    const stageTagCandidates = stageTags.map((tag) => ({
+      id: tag.id,
+      slug: tag.slug,
+      name: tag.name,
+    }));
 
     // ============================================================
     // ETAPA 1: Coletar TODAS as conversas e agrupar por contato
@@ -842,15 +843,6 @@ class ChatwootService {
     // Fallback: se nenhuma conversa tem label de etapa, usar labels
     // aplicadas diretamente no contato (n8n pode aplicar lá).
     // ============================================================
-    const matchTag = (label: string) => {
-      const normalized = normalize(label);
-      return (
-        tagBySlug.get(label) ||
-        tagByNormalizedSlug.get(normalized) ||
-        tagByName.get(label.toLowerCase().replace(/-/g, ' '))
-      );
-    };
-
     const conversationActivity = (c: any): number => {
       // Chatwoot expõe timestamps em segundos (epoch). Quanto maior, mais recente.
       return (
@@ -916,16 +908,39 @@ class ChatwootService {
       let resolvedLabel: string | null = null;
       let resolvedSource: 'conversation' | 'contact' | null = null;
       let resolvedConvId: number | null = null;
+      let resolvedStageMatches = 0;
 
       try {
         const contactLabels = await this.getContactLabels(accountId, sender.id);
-        for (const label of contactLabels) {
-          const matched = matchTag(label);
-          if (matched) {
-            resolvedTagId = matched.id;
-            resolvedLabel = label;
-            resolvedSource = 'contact';
-            break;
+        const resolvedFromContact = resolveLatestStageTagFromLabels(contactLabels, stageTagCandidates);
+        if (resolvedFromContact.tag) {
+          resolvedTagId = resolvedFromContact.tag.id;
+          resolvedLabel = resolvedFromContact.label;
+          resolvedSource = 'contact';
+          resolvedStageMatches = resolvedFromContact.matchCount;
+
+          if (contact.chatwootContactId) {
+            const winningKey = resolvedFromContact.normalizedKey;
+            const dedupedContactLabels = contactLabels.filter((label) => {
+              const labelKey = normalizeStageKey(label);
+              if (!labelKey) return false;
+              const isStageLabel = stageTagCandidates.some((tag) =>
+                [tag.slug, tag.name].some((candidate) => normalizeStageKey(candidate) === labelKey)
+              );
+              return !isStageLabel || labelKey === winningKey;
+            });
+
+            const uniqueLabels = Array.from(new Set(dedupedContactLabels));
+            if (uniqueLabels.length !== contactLabels.length) {
+              await this.updateContactLabels(accountId, contact.chatwootContactId, uniqueLabels);
+              logger.info('[SyncContacts] Normalized contact stage labels', {
+                contactId: contact.id,
+                chatwootContactId: contact.chatwootContactId,
+                before: contactLabels,
+                after: uniqueLabels,
+                winningLabel: resolvedFromContact.label,
+              });
+            }
           }
         }
       } catch (err) {
@@ -938,17 +953,15 @@ class ChatwootService {
       if (!resolvedTagId) {
         for (const conv of sortedConvs) {
           const labels: string[] = Array.isArray(conv.labels) ? conv.labels : [];
-          for (const label of labels) {
-            const matched = matchTag(label);
-            if (matched) {
-              resolvedTagId = matched.id;
-              resolvedLabel = label;
-              resolvedSource = 'conversation';
-              resolvedConvId = conv.id;
-              break;
-            }
-          }
-          if (resolvedTagId) break;
+          const resolvedFromConversation = resolveLatestStageTagFromLabels(labels, stageTagCandidates);
+          if (!resolvedFromConversation.tag) continue;
+
+          resolvedTagId = resolvedFromConversation.tag.id;
+          resolvedLabel = resolvedFromConversation.label;
+          resolvedSource = 'conversation';
+          resolvedConvId = conv.id;
+          resolvedStageMatches = resolvedFromConversation.matchCount;
+          break;
         }
       }
 
@@ -978,6 +991,7 @@ class ChatwootService {
             label: resolvedLabel,
             newStageTagId: resolvedTagId,
             source: resolvedSource,
+            matchedStageLabels: resolvedStageMatches,
             totalConversations: sortedConvs.length,
           });
         }
