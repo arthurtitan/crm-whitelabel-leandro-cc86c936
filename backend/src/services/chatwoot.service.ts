@@ -729,8 +729,19 @@ class ChatwootService {
     const normalize = (s: string) => s.toLowerCase().replace(/-/g, '_');
     const tagByNormalizedSlug = new Map(stageTags.map(t => [normalize(t.slug), t]));
 
-    // Fetch all conversations (paginated)
+    // ============================================================
+    // ETAPA 1: Coletar TODAS as conversas e agrupar por contato
+    // ------------------------------------------------------------
+    // Um contato no Chatwoot pode ter múltiplas conversas (abertas,
+    // resolvidas, reabertas). Cada conversa tem seu próprio conjunto
+    // de labels. Para decidir corretamente a etapa do Kanban, NUNCA
+    // devemos processar conversa-a-conversa (isso causa oscilação).
+    // Em vez disso, agregamos todas as conversas do contato e
+    // escolhemos a MAIS RECENTE (last_activity_at) como fonte de
+    // verdade — é a que reflete o estado atual do atendimento.
+    // ============================================================
     const seenChatwootContactIds = new Set<number>();
+    const conversationsByContact = new Map<number, { sender: any; conversations: any[] }>();
     let page = 1;
     const maxPages = 50;
 
@@ -752,110 +763,170 @@ class ChatwootService {
 
         seenChatwootContactIds.add(sender.id);
 
-        // Find or create contact
-        let contact = await prisma.contact.findFirst({
-          where: { accountId, chatwootContactId: sender.id },
-        });
-
-        if (!contact) {
-          contact = await prisma.contact.create({
-            data: {
-              accountId,
-              chatwootContactId: sender.id,
-              chatwootConversationId: conv.id,
-              nome: sender.name || null,
-              telefone: sender.phone_number || null,
-              email: sender.email?.toLowerCase() || null,
-              origem: 'whatsapp',
-            },
-          });
-          created++;
+        const bucket = conversationsByContact.get(sender.id);
+        if (bucket) {
+          bucket.conversations.push(conv);
         } else {
-          // Update if data changed
-          const updates: any = {};
-          if (sender.name && sender.name !== contact.nome) updates.nome = sender.name;
-          if (sender.phone_number && sender.phone_number !== contact.telefone) updates.telefone = sender.phone_number;
-          if (sender.email && sender.email.toLowerCase() !== contact.email) updates.email = sender.email.toLowerCase();
-          if (conv.id && conv.id !== contact.chatwootConversationId) updates.chatwootConversationId = conv.id;
+          conversationsByContact.set(sender.id, { sender, conversations: [conv] });
+        }
+      }
 
-          if (Object.keys(updates).length > 0) {
-            await prisma.contact.update({
-              where: { id: contact.id },
-              data: updates,
-            });
-            updated++;
-          }
+      page++;
+    }
+
+    // ============================================================
+    // ETAPA 2: Para cada contato, decidir a etapa baseando-se na
+    // conversa MAIS RECENTE (último last_activity_at).
+    // Fallback: se nenhuma conversa tem label de etapa, usar labels
+    // aplicadas diretamente no contato (n8n pode aplicar lá).
+    // ============================================================
+    const matchTag = (label: string) => {
+      const normalized = normalize(label);
+      return (
+        tagBySlug.get(label) ||
+        tagByNormalizedSlug.get(normalized) ||
+        tagByName.get(label.toLowerCase().replace(/-/g, ' '))
+      );
+    };
+
+    const conversationActivity = (c: any): number => {
+      // Chatwoot expõe timestamps em segundos (epoch). Quanto maior, mais recente.
+      return (
+        Number(c.last_activity_at) ||
+        Number(c.timestamp) ||
+        Number(c.last_non_activity_message?.created_at) ||
+        Number(c.created_at) ||
+        0
+      );
+    };
+
+    for (const { sender, conversations } of conversationsByContact.values()) {
+      // Find or create contact
+      let contact = await prisma.contact.findFirst({
+        where: { accountId, chatwootContactId: sender.id },
+      });
+
+      // Conversa mais recente = fonte da verdade
+      const sortedConvs = [...conversations].sort(
+        (a, b) => conversationActivity(b) - conversationActivity(a)
+      );
+      const latestConv = sortedConvs[0];
+
+      if (!contact) {
+        contact = await prisma.contact.create({
+          data: {
+            accountId,
+            chatwootContactId: sender.id,
+            chatwootConversationId: latestConv.id,
+            nome: sender.name || null,
+            telefone: sender.phone_number || null,
+            email: sender.email?.toLowerCase() || null,
+            origem: 'whatsapp',
+          },
+        });
+        created++;
+      } else {
+        const updates: any = {};
+        if (sender.name && sender.name !== contact.nome) updates.nome = sender.name;
+        if (sender.phone_number && sender.phone_number !== contact.telefone) updates.telefone = sender.phone_number;
+        if (sender.email && sender.email.toLowerCase() !== contact.email) updates.email = sender.email.toLowerCase();
+        if (latestConv.id && latestConv.id !== contact.chatwootConversationId) {
+          updates.chatwootConversationId = latestConv.id;
         }
 
-        // Match conversation labels to stage tags
-        // 1) Labels da conversa (caminho preferido)
-        const conversationLabels: string[] = Array.isArray(conv.labels) ? conv.labels : [];
+        if (Object.keys(updates).length > 0) {
+          await prisma.contact.update({
+            where: { id: contact.id },
+            data: updates,
+          });
+          updated++;
+        }
+      }
 
-        // 2) Fallback/merge: labels aplicadas no contato em si.
-        // O n8n pode aplicar labels via /contacts/:id/labels ao invés de
-        // /conversations/:id/labels — sem isso o sync nunca enxergaria a etapa.
-        let contactLabels: string[] = [];
+      // ----------------------------------------------------------
+      // Resolver etapa: prioridade da conversa MAIS RECENTE.
+      // Se ela não tiver label de etapa, percorre as anteriores
+      // (em ordem de recência). Se ainda assim nada bater, usa
+      // labels do contato como último fallback.
+      // ----------------------------------------------------------
+      let resolvedTagId: string | null = null;
+      let resolvedLabel: string | null = null;
+      let resolvedSource: 'conversation' | 'contact' | null = null;
+      let resolvedConvId: number | null = null;
+
+      for (const conv of sortedConvs) {
+        const labels: string[] = Array.isArray(conv.labels) ? conv.labels : [];
+        for (const label of labels) {
+          const matched = matchTag(label);
+          if (matched) {
+            resolvedTagId = matched.id;
+            resolvedLabel = label;
+            resolvedSource = 'conversation';
+            resolvedConvId = conv.id;
+            break;
+          }
+        }
+        if (resolvedTagId) break;
+      }
+
+      if (!resolvedTagId) {
+        // Fallback: labels do contato
         try {
           const contactLabelsResp = await this.makeRequest<{ payload?: string[] } | string[]>(
             config,
             `/contacts/${sender.id}/labels`
           );
-          contactLabels = Array.isArray(contactLabelsResp)
+          const contactLabels: string[] = Array.isArray(contactLabelsResp)
             ? (contactLabelsResp as string[])
             : ((contactLabelsResp as { payload?: string[] })?.payload || []);
+
+          for (const label of contactLabels) {
+            const matched = matchTag(label);
+            if (matched) {
+              resolvedTagId = matched.id;
+              resolvedLabel = label;
+              resolvedSource = 'contact';
+              break;
+            }
+          }
         } catch (err) {
           logger.debug('[SyncContacts] Failed to fetch contact labels', {
             chatwootContactId: sender.id,
             error: (err as any)?.message,
           });
         }
-
-        // Mesclar mantendo ordem: conversa primeiro (mais específica), depois contato
-        const mergedLabels = Array.from(new Set([...conversationLabels, ...contactLabels]));
-
-        if (mergedLabels.length > 0) {
-          for (const label of mergedLabels) {
-            const normalized = normalize(label);
-            const matchedTag = tagBySlug.get(label) 
-              || tagByNormalizedSlug.get(normalized) 
-              || tagByName.get(label.toLowerCase().replace(/-/g, ' '));
-            if (matchedTag) {
-              // Verificar etapa atual do lead. Só atualiza se for diferente.
-              const currentStageTag = await prisma.leadTag.findFirst({
-                where: { contactId: contact.id, tag: { type: 'stage' } },
-                select: { tagId: true },
-              });
-
-              if (currentStageTag?.tagId !== matchedTag.id) {
-                // Trocar etapa: remove a antiga e aplica a nova
-                await prisma.leadTag.deleteMany({
-                  where: { contactId: contact.id, tag: { type: 'stage' } },
-                });
-                await prisma.leadTag.create({
-                  data: {
-                    contactId: contact.id,
-                    tagId: matchedTag.id,
-                    appliedByType: 'system',
-                    source: 'chatwoot',
-                  },
-                });
-                leadTagsApplied++;
-                logger.info('[SyncContacts] Stage updated from Chatwoot label', {
-                  contactId: contact.id,
-                  chatwootContactId: sender.id,
-                  conversationId: conv.id,
-                  label,
-                  newStageTagId: matchedTag.id,
-                  source: conversationLabels.includes(label) ? 'conversation' : 'contact',
-                });
-              }
-              break; // Only one stage tag
-            }
-          }
-        }
       }
 
-      page++;
+      if (resolvedTagId) {
+        const currentStageTag = await prisma.leadTag.findFirst({
+          where: { contactId: contact.id, tag: { type: 'stage' } },
+          select: { tagId: true },
+        });
+
+        if (currentStageTag?.tagId !== resolvedTagId) {
+          await prisma.leadTag.deleteMany({
+            where: { contactId: contact.id, tag: { type: 'stage' } },
+          });
+          await prisma.leadTag.create({
+            data: {
+              contactId: contact.id,
+              tagId: resolvedTagId,
+              appliedByType: 'system',
+              source: 'chatwoot',
+            },
+          });
+          leadTagsApplied++;
+          logger.info('[SyncContacts] Stage updated from Chatwoot', {
+            contactId: contact.id,
+            chatwootContactId: sender.id,
+            conversationId: resolvedConvId,
+            label: resolvedLabel,
+            newStageTagId: resolvedTagId,
+            source: resolvedSource,
+            totalConversations: sortedConvs.length,
+          });
+        }
+      }
     }
 
     // Delete orphan contacts (created > 5 min ago, not seen in Chatwoot)
