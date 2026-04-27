@@ -63,29 +63,37 @@ const audienceApi = {
     return enriched.map(normalizeAudience);
   },
 
-  async create(accountId: string, form: { name: string; description: string }): Promise<void> {
+  async create(accountId: string, form: { name: string; description: string }): Promise<Audience> {
     if (useBackend) {
-      await apiClient.post(API_ENDPOINTS.EMAIL.AUDIENCES, form);
-      return;
+      const res = await apiClient.post<any>(API_ENDPOINTS.EMAIL.AUDIENCES, form);
+      const data = res?.data ?? res;
+      return normalizeAudience({ ...data, contact_count: data?.contact_count ?? 0 });
     }
     const { supabase } = await import('@/integrations/supabase/client');
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('email_audiences')
-      .insert({ account_id: accountId, name: form.name, description: form.description || null });
+      .insert({ account_id: accountId, name: form.name, description: form.description || null })
+      .select('*')
+      .single();
     if (error) throw error;
+    return normalizeAudience({ ...data, contact_count: 0 });
   },
 
-  async update(id: string, form: { name: string; description: string }): Promise<void> {
+  async update(id: string, form: { name: string; description: string }): Promise<Audience> {
     if (useBackend) {
-      await apiClient.put(API_ENDPOINTS.EMAIL.AUDIENCE(id), { name: form.name, description: form.description || null });
-      return;
+      const res = await apiClient.put<any>(API_ENDPOINTS.EMAIL.AUDIENCE(id), { name: form.name, description: form.description || null });
+      const data = res?.data ?? res;
+      return normalizeAudience(data);
     }
     const { supabase } = await import('@/integrations/supabase/client');
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('email_audiences')
       .update({ name: form.name, description: form.description || null })
-      .eq('id', id);
+      .eq('id', id)
+      .select('*')
+      .single();
     if (error) throw error;
+    return normalizeAudience(data);
   },
 
   async delete(id: string): Promise<void> {
