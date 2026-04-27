@@ -598,7 +598,22 @@ export default function EmailCampaignsTab() {
           <Button variant="ghost" size="sm" onClick={() => setDeleteId(selectedCampaign.id)}>
             <Trash2 className="w-4 h-4 text-destructive" />
           </Button>
-          <Button variant="outline" size="sm" onClick={loadData}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              if (!selectedCampaign) return loadData();
+              try {
+                const stats = await emailService.getCampaignStats(selectedCampaign.id);
+                setCampaigns(prev => prev.map(c => c.id === selectedCampaign.id ? { ...c, stats: { ...stats } } : c));
+                setSelectedCampaign(prev => prev ? { ...prev, stats: { ...stats } } : prev);
+                toast.success('Métricas atualizadas');
+              } catch (err: any) {
+                toast.error(friendlyEmailError(err, 'Erro ao atualizar métricas'));
+              }
+            }}
+            title="Atualizar métricas"
+          >
             <RefreshCw className="w-4 h-4" />
           </Button>
         </div>
