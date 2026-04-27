@@ -407,6 +407,44 @@ class ChatwootService {
     return response.payload || [];
   }
 
+  /**
+   * List labels applied directly to a contact
+   */
+  async getContactLabels(accountId: string, contactId: number): Promise<string[]> {
+    const config = await this.getAccountConfig(accountId);
+    const response = await this.makeRequest<{ payload?: string[] } | string[]>(
+      config,
+      `/contacts/${contactId}/labels`
+    );
+
+    return Array.isArray(response)
+      ? response
+      : ((response as { payload?: string[] })?.payload || []);
+  }
+
+  /**
+   * Update contact labels (replace all)
+   */
+  async updateContactLabels(
+    accountId: string,
+    contactId: number,
+    labels: string[]
+  ): Promise<ChatwootLabel[]> {
+    const config = await this.getAccountConfig(accountId);
+
+    const response = await this.makeRequest<{ payload: ChatwootLabel[] }>(
+      config,
+      `/contacts/${contactId}/labels`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ labels }),
+      }
+    );
+
+    logger.info('Contact labels updated', { accountId, contactId, labels });
+    return response.payload || [];
+  }
+
   // ============================================
   // Contacts
   // ============================================
@@ -635,12 +673,36 @@ class ChatwootService {
 
     try {
       const stageLabels = [...new Set(contact.leadTags.map((lt) => lt.tag.slug))];
+      if (!stageLabels.includes(tagSlug)) stageLabels.push(tagSlug);
 
-      if (!stageLabels.includes(tagSlug)) {
-        stageLabels.push(tagSlug);
+      const currentConversation = await this.getConversation(accountId, contact.chatwootConversationId);
+      const conversationLabels = Array.isArray(currentConversation?.labels) ? currentConversation.labels : [];
+      const contactRecord = await prisma.contact.findUnique({
+        where: { id: contactId },
+        select: { chatwootContactId: true },
+      });
+
+      const allStageTags = await prisma.tag.findMany({
+        where: { accountId, type: 'stage', ativo: true },
+        select: { slug: true, name: true },
+      });
+
+      const normalizeStageKey = (value: string) => value.toLowerCase().replace(/-/g, '_');
+      const stageKeys = new Set(
+        allStageTags.flatMap((tag) => [normalizeStageKey(tag.slug), normalizeStageKey(tag.name)])
+      );
+
+      const preserveNonStageLabels = (labels: string[]) =>
+        labels.filter((label) => !stageKeys.has(normalizeStageKey(label)));
+
+      const nextConversationLabels = [...new Set([...preserveNonStageLabels(conversationLabels), ...stageLabels])];
+      await this.updateConversationLabels(accountId, contact.chatwootConversationId, nextConversationLabels);
+
+      if (contactRecord?.chatwootContactId) {
+        const existingContactLabels = await this.getContactLabels(accountId, contactRecord.chatwootContactId);
+        const nextContactLabels = [...new Set([...preserveNonStageLabels(existingContactLabels), ...stageLabels])];
+        await this.updateContactLabels(accountId, contactRecord.chatwootContactId, nextContactLabels);
       }
-
-      await this.updateConversationLabels(accountId, contact.chatwootConversationId, stageLabels);
 
       logger.info('Synced lead stage to Chatwoot conversation', {
         contactId,
