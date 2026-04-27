@@ -44,6 +44,20 @@ import StepRecipientsPanel from '@/components/email/StepRecipientsPanel';
 import { apiClient } from '@/api/client';
 import { API_ENDPOINTS } from '@/api/endpoints';
 
+// Map low-level errors (HTTP 429, network, etc.) to clear user-facing messages
+// so the UI never silently swallows a failed save.
+function friendlyEmailError(err: any, fallback: string): string {
+  const status = err?.status ?? err?.response?.status;
+  const code = err?.code ?? err?.response?.data?.error?.code;
+  if (status === 429 || code === 'RATE_LIMIT_EXCEEDED') {
+    return 'O servidor recebeu muitas requisições simultâneas. Aguarde alguns segundos e tente novamente.';
+  }
+  if (status === 401 || status === 403) {
+    return 'Sessão expirada ou sem permissão. Faça login novamente.';
+  }
+  return err?.message || fallback;
+}
+
 interface Audience {
   id: string;
   name: string;
@@ -164,15 +178,18 @@ export default function EmailCampaignsTab() {
       }
       setAudiences(audWithCounts);
 
-      // Enrich campaigns
-      const enriched: CampaignFull[] = await Promise.all(campaignsData.map(async (camp: any) => {
+      // Enrich campaigns WITHOUT firing one stats request per campaign.
+      // The dashboard previously triggered N extra HTTP calls on every load
+      // (one per campaign), which combined with templates/audiences/cadences
+      // easily blew through any sensible per-IP rate limit. Stats are now
+      // fetched lazily for the currently selected campaign only.
+      const emptyStats = { total: 0, sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, failed: 0, enrollments: 0 };
+      const enriched: CampaignFull[] = campaignsData.map((camp: any) => {
         const linked = cadencesData.filter((c: any) => c.campaign_id === camp.id);
         const audienceId = camp.audience_id ?? camp.audience?.id ?? null;
         const audience = audienceId ? audWithCounts.find(a => a.id === audienceId) || null : null;
-        let stats = { total: 0, sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, failed: 0, enrollments: 0 };
-        try { stats = await emailService.getCampaignStats(camp.id); } catch {}
-        return { ...camp, audience_id: audienceId, linkedCadences: linked, audience, stats };
-      }));
+        return { ...camp, audience_id: audienceId, linkedCadences: linked, audience, stats: { ...emptyStats } };
+      });
 
       setCampaigns(enriched);
       setTemplates(templatesData);
@@ -188,6 +205,12 @@ export default function EmailCampaignsTab() {
           || nextCampaign.linkedCadences?.[0]
           || null;
         setSelectedCadence(nextCadence);
+        // Lazy-load stats for the active campaign only.
+        emailService.getCampaignStats(nextCampaign.id)
+          .then((stats) => {
+            setCampaigns(prev => prev.map(c => c.id === nextCampaign.id ? { ...c, stats: { ...stats } } : c));
+          })
+          .catch(() => { /* stats are non-critical */ });
       } else {
         setSelectedCadence(null);
       }
@@ -209,20 +232,41 @@ export default function EmailCampaignsTab() {
         audienceId: form.audienceId || null,
       };
 
+      const emptyStats = { total: 0, sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, failed: 0, enrollments: 0 };
+
       if (editingCampaign) {
-        await emailService.updateCampaign(editingCampaign.id, payload);
+        const updated: any = await emailService.updateCampaign(editingCampaign.id, payload);
+        const audience = payload.audienceId ? audiences.find(a => a.id === payload.audienceId) || null : null;
+        // Optimistic local update — avoid re-fetching the entire dashboard
+        // (which used to fan out into N parallel requests and trip the limiter).
+        setCampaigns(prev => prev.map(c => c.id === editingCampaign.id
+          ? { ...c, ...updated, audience_id: payload.audienceId, audience }
+          : c));
+        if (selectedCampaign?.id === editingCampaign.id) {
+          setSelectedCampaign(prev => prev ? { ...prev, ...updated, audience_id: payload.audienceId, audience } : prev);
+        }
         toast.success('Campanha atualizada!');
       } else {
-        const created = await emailService.createCampaign(payload);
+        const created: any = await emailService.createCampaign(payload);
+        const audience = payload.audienceId ? audiences.find(a => a.id === payload.audienceId) || null : null;
+        const enriched: CampaignFull = {
+          ...created,
+          audience_id: payload.audienceId,
+          audience,
+          linkedCadences: [],
+          stats: { ...emptyStats },
+        };
+        setCampaigns(prev => [enriched, ...prev]);
         selectedCampaignIdRef.current = created.id;
+        setSelectedCampaign(enriched);
+        setSelectedCadence(null);
         toast.success('Campanha criada!');
       }
       setShowCreateDialog(false);
       setEditingCampaign(null);
       setForm({ name: '', description: '', audienceId: '' });
-      await loadData();
     } catch (err: any) {
-      toast.error(err?.message || 'Erro ao salvar campanha');
+      toast.error(friendlyEmailError(err, 'Erro ao salvar campanha'));
     }
   };
 
@@ -235,7 +279,7 @@ export default function EmailCampaignsTab() {
       setCampaigns(prev => prev.filter(c => c.id !== deleteId));
       setDeleteId(null);
     } catch (err: any) {
-      toast.error(err?.message || 'Erro ao excluir');
+      toast.error(friendlyEmailError(err, 'Erro ao excluir'));
     }
   };
 
@@ -261,7 +305,7 @@ export default function EmailCampaignsTab() {
       setEditingCadence(null);
       await loadData();
     } catch (err: any) {
-      toast.error(err?.message || 'Erro ao salvar cadência');
+      toast.error(friendlyEmailError(err, 'Erro ao salvar cadência'));
     }
   };
 
@@ -272,7 +316,7 @@ export default function EmailCampaignsTab() {
       toast.success('Cadência excluída!');
       await loadData();
     } catch (err: any) {
-      toast.error(err?.message || 'Erro ao excluir');
+      toast.error(friendlyEmailError(err, 'Erro ao excluir'));
     }
   };
 
@@ -293,7 +337,7 @@ export default function EmailCampaignsTab() {
       setShowStepAI(false);
       await loadData();
     } catch (err: any) {
-      toast.error(err?.message || 'Erro ao salvar step');
+      toast.error(friendlyEmailError(err, 'Erro ao salvar step'));
     }
   };
 
@@ -303,7 +347,7 @@ export default function EmailCampaignsTab() {
       toast.success('Step excluído!');
       await loadData();
     } catch (err: any) {
-      toast.error(err?.message || 'Erro ao excluir');
+      toast.error(friendlyEmailError(err, 'Erro ao excluir'));
     }
   };
 
@@ -317,7 +361,7 @@ export default function EmailCampaignsTab() {
       setRuleForm({ triggerEvent: 'opened', targetCadenceId: '', delayHours: 0, timeoutHours: 48 });
       await loadData();
     } catch (err: any) {
-      toast.error(err?.message || 'Erro ao criar regra');
+      toast.error(friendlyEmailError(err, 'Erro ao criar regra'));
     }
   };
 
@@ -327,7 +371,7 @@ export default function EmailCampaignsTab() {
       toast.success('Regra excluída!');
       await loadData();
     } catch (err: any) {
-      toast.error(err?.message || 'Erro');
+      toast.error(friendlyEmailError(err, 'Erro'));
     }
   };
 
@@ -355,7 +399,7 @@ export default function EmailCampaignsTab() {
       );
       await loadData();
     } catch (err: any) {
-      toast.error(err?.message || 'Erro ao disparar campanha');
+      toast.error(friendlyEmailError(err, 'Erro ao disparar campanha'));
     } finally {
       setDispatching(false);
     }
@@ -381,7 +425,7 @@ export default function EmailCampaignsTab() {
       toast.success('Template atualizado! Próximos envios usarão a versão nova.');
       setEditingTemplate(null);
     } catch (err: any) {
-      toast.error(err?.message || 'Erro ao salvar template');
+      toast.error(friendlyEmailError(err, 'Erro ao salvar template'));
     } finally {
       setSavingTemplate(false);
     }

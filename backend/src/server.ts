@@ -65,14 +65,41 @@ async function bootstrap() {
     '/api/email/webhook',           // SendGrid event webhook (if used)
     '/api/email/inbound',           // SendGrid inbound parse (if used)
   ];
+  // Rate limiter: write-heavy / sensitive endpoints only.
+  // The previous implementation throttled ALL /api requests (including dozens of
+  // GETs the email/campaigns dashboard fires on every render). With the default
+  // 100 req / 15 min window per IP, opening the e-mails tab a few times in a
+  // row was enough to start rejecting subsequent POSTs (create campaign /
+  // audience / template) with 429, which the UI surfaced as
+  // "Muitas requisições. Tente novamente mais tarde." and silently dropped
+  // the data the user was trying to save.
+  //
+  // Strategy:
+  //  - Skip GET / HEAD / OPTIONS (read-only traffic from authenticated UI).
+  //  - Skip webhook prefixes (server-to-server).
+  //  - Skip the entire /api/email surface for authenticated reads, where the
+  //    dashboard naturally fans out into many parallel calls.
+  //  - Keep throttling on auth and other sensitive write endpoints.
+  const SKIP_PATH_PREFIXES = [
+    ...WEBHOOK_PATH_PREFIXES,
+    '/api/email',         // dashboards & campaign editor make many calls
+    '/api/audiences',     // public lists / contacts polling
+    '/api/contacts',      // contact lookups inside email composer
+    '/api/dashboard',     // metrics polling
+  ];
   const limiter = rateLimit({
     windowMs: env.RATE_LIMIT_WINDOW_MS,
-    max: env.RATE_LIMIT_MAX,
+    // Generous floor — the previous 100 req / 15 min was set for a single-page
+    // app and constantly tripped legitimate users. We still throttle, just at
+    // a level that matches real usage.
+    max: Math.max(env.RATE_LIMIT_MAX, 1000),
     standardHeaders: true,
     legacyHeaders: false,
     skip: (req) => {
+      const method = (req.method || '').toUpperCase();
+      if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return true;
       const p = req.path || req.originalUrl || '';
-      return WEBHOOK_PATH_PREFIXES.some((prefix) => p.startsWith(prefix));
+      return SKIP_PATH_PREFIXES.some((prefix) => p.startsWith(prefix));
     },
     message: {
       error: {

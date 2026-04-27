@@ -18,6 +18,18 @@ import { useBackend } from '@/config/backend.config';
 import { apiClient } from '@/api/client';
 import { API_ENDPOINTS } from '@/api/endpoints';
 
+function friendlyEmailError(err: any, fallback: string): string {
+  const status = err?.status ?? err?.response?.status;
+  const code = err?.code ?? err?.response?.data?.error?.code;
+  if (status === 429 || code === 'RATE_LIMIT_EXCEEDED') {
+    return 'O servidor recebeu muitas requisições simultâneas. Aguarde alguns segundos e tente novamente.';
+  }
+  if (status === 401 || status === 403) {
+    return 'Sessão expirada ou sem permissão. Faça login novamente.';
+  }
+  return err?.message || fallback;
+}
+
 interface Audience {
   id: string;
   account_id?: string;
@@ -63,29 +75,37 @@ const audienceApi = {
     return enriched.map(normalizeAudience);
   },
 
-  async create(accountId: string, form: { name: string; description: string }): Promise<void> {
+  async create(accountId: string, form: { name: string; description: string }): Promise<Audience> {
     if (useBackend) {
-      await apiClient.post(API_ENDPOINTS.EMAIL.AUDIENCES, form);
-      return;
+      const res = await apiClient.post<any>(API_ENDPOINTS.EMAIL.AUDIENCES, form);
+      const data = res?.data ?? res;
+      return normalizeAudience({ ...data, contact_count: data?.contact_count ?? 0 });
     }
     const { supabase } = await import('@/integrations/supabase/client');
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('email_audiences')
-      .insert({ account_id: accountId, name: form.name, description: form.description || null });
+      .insert({ account_id: accountId, name: form.name, description: form.description || null })
+      .select('*')
+      .single();
     if (error) throw error;
+    return normalizeAudience({ ...data, contact_count: 0 });
   },
 
-  async update(id: string, form: { name: string; description: string }): Promise<void> {
+  async update(id: string, form: { name: string; description: string }): Promise<Audience> {
     if (useBackend) {
-      await apiClient.put(API_ENDPOINTS.EMAIL.AUDIENCE(id), { name: form.name, description: form.description || null });
-      return;
+      const res = await apiClient.put<any>(API_ENDPOINTS.EMAIL.AUDIENCE(id), { name: form.name, description: form.description || null });
+      const data = res?.data ?? res;
+      return normalizeAudience(data);
     }
     const { supabase } = await import('@/integrations/supabase/client');
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('email_audiences')
       .update({ name: form.name, description: form.description || null })
-      .eq('id', id);
+      .eq('id', id)
+      .select('*')
+      .single();
     if (error) throw error;
+    return normalizeAudience(data);
   },
 
   async delete(id: string): Promise<void> {
@@ -301,18 +321,29 @@ export default function EmailAudiencesTab() {
   const handleSave = async () => {
     try {
       if (editingAudience) {
-        await audienceApi.update(editingAudience.id, form);
+        const updated = await audienceApi.update(editingAudience.id, form);
+        // Optimistic local update — no full refetch (which would fan out into
+        // dozens of GETs and could trip the rate limiter).
+        setAudiences(prev => prev.map(a => a.id === editingAudience.id
+          ? { ...a, ...updated, contact_count: a.contact_count }
+          : a));
+        if (selectedAudience?.id === editingAudience.id) {
+          setSelectedAudience(prev => prev ? { ...prev, ...updated, contact_count: prev.contact_count } : prev);
+        }
         toast.success('Público atualizado!');
       } else {
-        await audienceApi.create(accountId, form);
+        const created = await audienceApi.create(accountId, form);
+        const next = { ...created, contact_count: created.contact_count ?? 0 };
+        setAudiences(prev => [next, ...prev]);
+        // Auto-select if it's the first one
+        setSelectedAudience(prev => prev ?? next);
         toast.success('Público criado!');
       }
       setShowCreateDialog(false);
       setEditingAudience(null);
       setForm({ name: '', description: '' });
-      await loadAudiences();
     } catch (err: any) {
-      toast.error(err?.message || 'Erro ao salvar público');
+      toast.error(friendlyEmailError(err, 'Erro ao salvar público'));
     }
   };
 
@@ -325,7 +356,7 @@ export default function EmailAudiencesTab() {
       setAudiences(prev => prev.filter(a => a.id !== deleteId));
       setDeleteId(null);
     } catch (err: any) {
-      toast.error(err?.message || 'Erro ao excluir público');
+      toast.error(friendlyEmailError(err, 'Erro ao excluir público'));
     }
   };
 
@@ -357,7 +388,7 @@ export default function EmailAudiencesTab() {
       loadAudienceContacts(selectedAudience.id);
       loadAudiences();
     } catch (err: any) {
-      toast.error(err?.message || 'Erro ao adicionar contatos');
+      toast.error(friendlyEmailError(err, 'Erro ao adicionar contatos'));
     }
   };
 
@@ -385,7 +416,7 @@ export default function EmailAudiencesTab() {
       loadAudienceContacts(selectedAudience.id);
       loadAudiences();
     } catch (err: any) {
-      toast.error(err?.message || 'Erro ao adicionar e-mail');
+      toast.error(friendlyEmailError(err, 'Erro ao adicionar e-mail'));
     }
   };
 
@@ -397,7 +428,7 @@ export default function EmailAudiencesTab() {
       loadAudienceContacts(selectedAudience.id);
       loadAudiences();
     } catch (err: any) {
-      toast.error(err?.message || 'Erro');
+      toast.error(friendlyEmailError(err, 'Erro'));
     }
   };
 
@@ -435,7 +466,7 @@ export default function EmailAudiencesTab() {
       loadAudienceContacts(selectedAudience.id);
       loadAudiences();
     } catch (err: any) {
-      toast.error(err?.message || 'Erro na importação');
+      toast.error(friendlyEmailError(err, 'Erro na importação'));
     } finally {
       setImportLoading(false);
     }
