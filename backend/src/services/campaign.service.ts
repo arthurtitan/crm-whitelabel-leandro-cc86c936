@@ -150,7 +150,8 @@ export const campaignService = {
     const cadenceIds = cadences.map(c => c.id);
     if (cadenceIds.length === 0) return { total: 0, sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, failed: 0, enrollments: 0 };
 
-     const [total, sentOnly, deliveredOnly, openedOnly, clickedOnly, bounced, failed, enrollments] = await Promise.all([
+     // Conta envios pelo status atual; eventos cumulam hierarquicamente.
+     const [total, sentOnly, deliveredOnly, openedOnly, clickedOnly, bounced, failed, distinctEnrollments] = await Promise.all([
        prisma.emailSend.count({ where: { enrollment: { cadenceId: { in: cadenceIds } } } }),
        prisma.emailSend.count({ where: { enrollment: { cadenceId: { in: cadenceIds } }, status: 'sent' } }),
        prisma.emailSend.count({ where: { enrollment: { cadenceId: { in: cadenceIds } }, status: 'delivered' } }),
@@ -158,15 +159,22 @@ export const campaignService = {
        prisma.emailSend.count({ where: { enrollment: { cadenceId: { in: cadenceIds } }, status: 'clicked' } }),
        prisma.emailSend.count({ where: { enrollment: { cadenceId: { in: cadenceIds } }, status: 'bounced' } }),
        prisma.emailSend.count({ where: { enrollment: { cadenceId: { in: cadenceIds } }, status: 'failed' } }),
-       prisma.emailEnrollment.count({ where: { cadenceId: { in: cadenceIds } } }),
+       // Contatos únicos inscritos (não enrollments duplicados de re-disparos)
+       prisma.emailEnrollment.findMany({
+         where: { cadenceId: { in: cadenceIds } },
+         distinct: ['contactId'],
+         select: { contactId: true },
+       }),
      ]);
- 
-     // Cumulative metrics: Sent includes anything that reached the destination or beyond
+
+     // Métricas cumulativas: quem clicou também abriu, quem abriu também recebeu, quem recebeu também foi enviado.
+     const clicked = clickedOnly;
      const opened = openedOnly + clickedOnly;
      const delivered = deliveredOnly + opened;
      const sent = sentOnly + delivered;
- 
-     return { total, sent, delivered, opened, clicked: clickedOnly, bounced, failed, enrollments };
+     const enrollments = distinctEnrollments.length;
+
+     return { total, sent, delivered, opened, clicked, bounced, failed, enrollments };
   },
 
   /**
