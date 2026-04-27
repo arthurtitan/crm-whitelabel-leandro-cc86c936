@@ -218,12 +218,14 @@ export const campaignService = {
       throw new Error('Nenhum contato com e-mail no público vinculado');
     }
 
-    // Skip contacts already enrolled (active/paused) in this cadence
+    // Skip contatos que já passaram pela cadência: active, paused E completed.
+    // Sem isso, cada clique em "Disparar agora" criava um enrollment novo para o mesmo
+    // contato, inflando os números (ex.: público de 1 contato com 3 inscritos / 3 envios).
     const existing = await prisma.emailEnrollment.findMany({
       where: {
         cadenceId: cadence.id,
         contactId: { in: eligibleContactIds },
-        status: { in: ['active', 'paused'] },
+        status: { in: ['active', 'paused', 'completed'] },
       },
       select: { contactId: true },
     });
