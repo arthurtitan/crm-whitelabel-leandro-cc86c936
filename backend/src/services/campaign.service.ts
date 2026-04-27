@@ -150,7 +150,8 @@ export const campaignService = {
     const cadenceIds = cadences.map(c => c.id);
     if (cadenceIds.length === 0) return { total: 0, sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, failed: 0, enrollments: 0 };
 
-     const [total, sentOnly, deliveredOnly, openedOnly, clickedOnly, bounced, failed, enrollments] = await Promise.all([
+     // Conta envios pelo status atual; eventos cumulam hierarquicamente.
+     const [total, sentOnly, deliveredOnly, openedOnly, clickedOnly, bounced, failed, distinctEnrollments] = await Promise.all([
        prisma.emailSend.count({ where: { enrollment: { cadenceId: { in: cadenceIds } } } }),
        prisma.emailSend.count({ where: { enrollment: { cadenceId: { in: cadenceIds } }, status: 'sent' } }),
        prisma.emailSend.count({ where: { enrollment: { cadenceId: { in: cadenceIds } }, status: 'delivered' } }),
@@ -158,15 +159,22 @@ export const campaignService = {
        prisma.emailSend.count({ where: { enrollment: { cadenceId: { in: cadenceIds } }, status: 'clicked' } }),
        prisma.emailSend.count({ where: { enrollment: { cadenceId: { in: cadenceIds } }, status: 'bounced' } }),
        prisma.emailSend.count({ where: { enrollment: { cadenceId: { in: cadenceIds } }, status: 'failed' } }),
-       prisma.emailEnrollment.count({ where: { cadenceId: { in: cadenceIds } } }),
+       // Contatos únicos inscritos (não enrollments duplicados de re-disparos)
+       prisma.emailEnrollment.findMany({
+         where: { cadenceId: { in: cadenceIds } },
+         distinct: ['contactId'],
+         select: { contactId: true },
+       }),
      ]);
- 
-     // Cumulative metrics: Sent includes anything that reached the destination or beyond
+
+     // Métricas cumulativas: quem clicou também abriu, quem abriu também recebeu, quem recebeu também foi enviado.
+     const clicked = clickedOnly;
      const opened = openedOnly + clickedOnly;
      const delivered = deliveredOnly + opened;
      const sent = sentOnly + delivered;
- 
-     return { total, sent, delivered, opened, clicked: clickedOnly, bounced, failed, enrollments };
+     const enrollments = distinctEnrollments.length;
+
+     return { total, sent, delivered, opened, clicked, bounced, failed, enrollments };
   },
 
   /**
@@ -210,12 +218,14 @@ export const campaignService = {
       throw new Error('Nenhum contato com e-mail no público vinculado');
     }
 
-    // Skip contacts already enrolled (active/paused) in this cadence
+    // Skip contatos que já passaram pela cadência: active, paused E completed.
+    // Sem isso, cada clique em "Disparar agora" criava um enrollment novo para o mesmo
+    // contato, inflando os números (ex.: público de 1 contato com 3 inscritos / 3 envios).
     const existing = await prisma.emailEnrollment.findMany({
       where: {
         cadenceId: cadence.id,
         contactId: { in: eligibleContactIds },
-        status: { in: ['active', 'paused'] },
+        status: { in: ['active', 'paused', 'completed'] },
       },
       select: { contactId: true },
     });

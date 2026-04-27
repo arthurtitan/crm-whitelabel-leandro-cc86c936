@@ -29,6 +29,20 @@ interface SendGridResponse {
   error?: string;
 }
 
+// Hierarquia de status: índice maior = mais avançado.
+// Eventos do SendGrid podem chegar fora de ordem (ex.: 'open' antes de 'delivered').
+// Nunca devemos regredir, apenas avançar timestamps.
+const STATUS_RANK: Record<string, number> = {
+  queued: 0,
+  sent: 1,
+  delivered: 2,
+  opened: 3,
+  clicked: 4,
+  bounced: 5,
+  spam: 6,
+  failed: 7,
+};
+
 export const sendgridService = {
   /**
    * Send an email via SendGrid API (REST, no SDK needed)
@@ -166,29 +180,46 @@ export const sendgridService = {
         if (!emailSend) continue;
 
         const updateData: any = {};
+        let nextStatus: string | null = null;
 
         switch (event.event) {
           case 'delivered':
-            updateData.status = 'delivered';
+            nextStatus = 'delivered';
             break;
           case 'open':
-            updateData.status = 'opened';
+            nextStatus = 'opened';
             updateData.openedAt = new Date();
             break;
           case 'click':
-            updateData.status = 'clicked';
+            nextStatus = 'clicked';
             updateData.clickedAt = new Date();
             break;
           case 'bounce':
           case 'dropped':
-            updateData.status = 'bounced';
+            nextStatus = 'bounced';
             updateData.bouncedAt = new Date();
             break;
           case 'spamreport':
-            updateData.status = 'spam';
+            nextStatus = 'spam';
             break;
           default:
             continue;
+        }
+
+        // Só promove o status se for mais avançado que o atual.
+        // Bounce/spam/failed sempre podem sobrescrever para refletir falha real.
+        if (nextStatus) {
+          const currentRank = STATUS_RANK[emailSend.status] ?? -1;
+          const nextRank = STATUS_RANK[nextStatus] ?? -1;
+          const isFailureEvent = ['bounced', 'spam', 'failed'].includes(nextStatus);
+          if (nextRank > currentRank || isFailureEvent) {
+            updateData.status = nextStatus;
+          }
+        }
+
+        if (Object.keys(updateData).length === 0) {
+          // Nada a atualizar (timestamps já gravados ou status superior).
+          continue;
         }
 
         await prisma.emailSend.update({
@@ -197,17 +228,17 @@ export const sendgridService = {
         });
 
         // Real-time branching: evaluate rules immediately for actionable events
-        if (['opened', 'clicked', 'bounced'].includes(updateData.status)) {
+        if (nextStatus && ['opened', 'clicked', 'bounced'].includes(nextStatus)) {
           try {
             const es = await getEmailService();
-            await es.evaluateRulesForSend(emailSend.id, updateData.status as 'opened' | 'clicked' | 'bounced');
+            await es.evaluateRulesForSend(emailSend.id, nextStatus as 'opened' | 'clicked' | 'bounced');
           } catch (branchErr: any) {
             logger.error(`[SendGrid Webhook] Branching error: ${branchErr.message}`);
           }
         }
 
         // If bounced, update enrollment too
-        if (updateData.status === 'bounced' && emailSend.enrollmentId) {
+        if (nextStatus === 'bounced' && emailSend.enrollmentId) {
           await prisma.emailEnrollment.update({
             where: { id: emailSend.enrollmentId },
             data: { status: 'bounced' },

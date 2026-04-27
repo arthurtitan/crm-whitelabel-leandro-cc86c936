@@ -143,7 +143,10 @@ export default function EmailCampaignsTab() {
   }, [selectedCampaign, selectedCadence, updateUrlSelection, loading]);
 
   const loadData = useCallback(async () => {
-    setLoading(true);
+    // Marca apenas o primeiro carregamento como "loading" (skeleton).
+    // Em refreshes subsequentes, mantemos a UI atual visível e apenas
+    // atualizamos os dados quando chegarem — nunca piscamos para zero.
+    setLoading(prev => (campaigns.length === 0 ? true : prev));
     try {
       const [campaignsData, cadencesData, templatesData] = await Promise.all([
         emailService.listCampaigns(),
@@ -178,17 +181,28 @@ export default function EmailCampaignsTab() {
       }
       setAudiences(audWithCounts);
 
-      // Enrich campaigns WITHOUT firing one stats request per campaign.
-      // The dashboard previously triggered N extra HTTP calls on every load
-      // (one per campaign), which combined with templates/audiences/cadences
-      // easily blew through any sensible per-IP rate limit. Stats are now
-      // fetched lazily for the currently selected campaign only.
       const emptyStats = { total: 0, sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, failed: 0, enrollments: 0 };
+
+      // Preserva stats já conhecidos (do estado anterior) para evitar piscar para zero.
+      // A próxima atualização (em paralelo) substitui pelos números frescos vindos do backend.
+      const previousStatsById = new Map<string, any>();
+      setCampaigns(prev => {
+        prev.forEach(c => { if (c.stats) previousStatsById.set(c.id, c.stats); });
+        return prev;
+      });
+
       const enriched: CampaignFull[] = campaignsData.map((camp: any) => {
         const linked = cadencesData.filter((c: any) => c.campaign_id === camp.id);
         const audienceId = camp.audience_id ?? camp.audience?.id ?? null;
         const audience = audienceId ? audWithCounts.find(a => a.id === audienceId) || null : null;
-        return { ...camp, audience_id: audienceId, linkedCadences: linked, audience, stats: { ...emptyStats } };
+        const previousStats = previousStatsById.get(camp.id);
+        return {
+          ...camp,
+          audience_id: audienceId,
+          linkedCadences: linked,
+          audience,
+          stats: previousStats ?? { ...emptyStats },
+        };
       });
 
       setCampaigns(enriched);
@@ -205,20 +219,31 @@ export default function EmailCampaignsTab() {
           || nextCampaign.linkedCadences?.[0]
           || null;
         setSelectedCadence(nextCadence);
-        // Lazy-load stats for the active campaign only.
-        emailService.getCampaignStats(nextCampaign.id)
-          .then((stats) => {
-            setCampaigns(prev => prev.map(c => c.id === nextCampaign.id ? { ...c, stats: { ...stats } } : c));
-          })
-          .catch(() => { /* stats are non-critical */ });
       } else {
         setSelectedCadence(null);
       }
+
+      // Carrega stats de TODAS as campanhas em paralelo, com pequeno escalonamento
+      // para suavizar carga em listas grandes. Atualiza item por item conforme chegam,
+      // garantindo que cada cartão receba seu número correto após F5.
+      enriched.forEach((camp, idx) => {
+        // Pequeno stagger evita disparar N requests no mesmo tick.
+        setTimeout(() => {
+          emailService.getCampaignStats(camp.id)
+            .then((stats) => {
+              setCampaigns(prev => prev.map(c => c.id === camp.id ? { ...c, stats: { ...stats } } : c));
+              // Mantém a campanha selecionada sincronizada com o stats fresco
+              setSelectedCampaign(prev => (prev && prev.id === camp.id) ? { ...prev, stats: { ...stats } } : prev);
+            })
+            .catch(() => { /* stats são não críticos — preservamos o último valor conhecido */ });
+        }, idx * 80);
+      });
     } catch (err: any) {
       console.error('Erro ao carregar campanhas:', err);
     } finally {
       setLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountId]);
 
   useEffect(() => { loadData(); }, [loadData]);
@@ -397,7 +422,13 @@ export default function EmailCampaignsTab() {
         ` • ${result.processed} e-mail(s) processados agora`,
         { duration: 6000 },
       );
-      await loadData();
+      // Atualiza apenas as métricas da campanha disparada — não recarrega o mundo todo,
+      // o que zerava visualmente os outros KPIs durante o fetch.
+      try {
+        const stats = await emailService.getCampaignStats(selectedCampaign.id);
+        setCampaigns(prev => prev.map(c => c.id === selectedCampaign.id ? { ...c, stats: { ...stats } } : c));
+        setSelectedCampaign(prev => prev ? { ...prev, stats: { ...stats } } : prev);
+      } catch { /* não crítico */ }
     } catch (err: any) {
       toast.error(friendlyEmailError(err, 'Erro ao disparar campanha'));
     } finally {
@@ -567,7 +598,22 @@ export default function EmailCampaignsTab() {
           <Button variant="ghost" size="sm" onClick={() => setDeleteId(selectedCampaign.id)}>
             <Trash2 className="w-4 h-4 text-destructive" />
           </Button>
-          <Button variant="outline" size="sm" onClick={loadData}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              if (!selectedCampaign) return loadData();
+              try {
+                const stats = await emailService.getCampaignStats(selectedCampaign.id);
+                setCampaigns(prev => prev.map(c => c.id === selectedCampaign.id ? { ...c, stats: { ...stats } } : c));
+                setSelectedCampaign(prev => prev ? { ...prev, stats: { ...stats } } : prev);
+                toast.success('Métricas atualizadas');
+              } catch (err: any) {
+                toast.error(friendlyEmailError(err, 'Erro ao atualizar métricas'));
+              }
+            }}
+            title="Atualizar métricas"
+          >
             <RefreshCw className="w-4 h-4" />
           </Button>
         </div>
