@@ -758,6 +758,23 @@ export default function EmailCampaignsTab() {
                 </div>
               </CardHeader>
               <CardContent>
+                {steps.length === 0 ? (
+                  <button
+                    className="w-full py-6 rounded-lg border-2 border-dashed border-primary/40 hover:border-primary hover:bg-primary/5 transition-colors flex flex-col items-center gap-2 text-sm"
+                    onClick={() => {
+                      setEditingStep(null);
+                      setStepForm({ dayNumber: 1, subject: '', bodyHtml: '', bodyText: '', templateId: null });
+                      setShowStepAI(false);
+                      setShowStepDialog(true);
+                    }}
+                  >
+                    <Plus className="w-6 h-6 text-primary" />
+                    <span className="font-medium">Adicionar primeiro e-mail</span>
+                    <span className="text-xs text-muted-foreground">
+                      Sem ao menos um step, o disparo não envia nada.
+                    </span>
+                  </button>
+                ) : (
                 <div className="flex items-start gap-2 overflow-x-auto pb-2">
                   {steps.map((step, idx) => (
                     <div key={step.id} className="flex items-center gap-2">
@@ -817,6 +834,7 @@ export default function EmailCampaignsTab() {
                     <Plus className="w-5 h-5 text-muted-foreground" />
                   </button>
                 </div>
+                )}
                 {steps.length > 0 && (
                   <p className="text-[10px] text-muted-foreground mt-2">
                     💡 Clique em um step para ver quem vai receber / quem já recebeu este e-mail.
