@@ -479,6 +479,15 @@ export default function EmailCampaignsTab() {
   const cadences = selectedCampaign?.linkedCadences || [];
   const steps = selectedCadence?.steps || [];
 
+  // Pré-condições para "Disparar agora" — usadas tanto no botão quanto no banner.
+  const missingAudience = !!selectedCampaign && !selectedCampaign.audience;
+  const missingCadence = !!selectedCampaign && !(selectedCampaign.linkedCadences?.length);
+  const missingSteps =
+    !!selectedCampaign &&
+    !missingCadence &&
+    !(selectedCampaign.linkedCadences || []).some(c => (c.steps?.length || 0) > 0);
+  const dispatchBlocked = missingAudience || missingCadence || missingSteps;
+
   if (loading) {
     return <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>;
   }
@@ -619,6 +628,31 @@ export default function EmailCampaignsTab() {
         </div>
       </div>
 
+      {/* Banner: pré-requisitos para o disparo */}
+      {dispatchBlocked && (
+        <Card className="border-amber-500/40 bg-amber-500/5">
+          <CardContent className="py-3 px-4 flex items-start gap-3">
+            <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+            <div className="flex-1 text-xs">
+              <p className="font-medium text-amber-200 mb-1">
+                Esta campanha ainda não pode ser disparada.
+              </p>
+              <ul className="space-y-0.5 text-muted-foreground">
+                {missingAudience && (
+                  <li>• Vincule um <strong>público</strong> à campanha (botão de editar acima).</li>
+                )}
+                {missingCadence && (
+                  <li>• Crie ao menos uma <strong>cadência</strong> na aba Cadências.</li>
+                )}
+                {missingSteps && (
+                  <li>• Adicione ao menos um <strong>e-mail (step)</strong> em uma cadência.</li>
+                )}
+              </ul>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
         {kpis.map(kpi => (
@@ -724,6 +758,23 @@ export default function EmailCampaignsTab() {
                 </div>
               </CardHeader>
               <CardContent>
+                {steps.length === 0 ? (
+                  <button
+                    className="w-full py-6 rounded-lg border-2 border-dashed border-primary/40 hover:border-primary hover:bg-primary/5 transition-colors flex flex-col items-center gap-2 text-sm"
+                    onClick={() => {
+                      setEditingStep(null);
+                      setStepForm({ dayNumber: 1, subject: '', bodyHtml: '', bodyText: '', templateId: null });
+                      setShowStepAI(false);
+                      setShowStepDialog(true);
+                    }}
+                  >
+                    <Plus className="w-6 h-6 text-primary" />
+                    <span className="font-medium">Adicionar primeiro e-mail</span>
+                    <span className="text-xs text-muted-foreground">
+                      Sem ao menos um step, o disparo não envia nada.
+                    </span>
+                  </button>
+                ) : (
                 <div className="flex items-start gap-2 overflow-x-auto pb-2">
                   {steps.map((step, idx) => (
                     <div key={step.id} className="flex items-center gap-2">
@@ -783,6 +834,7 @@ export default function EmailCampaignsTab() {
                     <Plus className="w-5 h-5 text-muted-foreground" />
                   </button>
                 </div>
+                )}
                 {steps.length > 0 && (
                   <p className="text-[10px] text-muted-foreground mt-2">
                     💡 Clique em um step para ver quem vai receber / quem já recebeu este e-mail.
