@@ -601,23 +601,77 @@ async function handleConversationUpdated(accountId: string, event: ChatwootWebho
   const incomingKeys = Array.from(
     new Set(
       rawLabels
-        .map((l: any) => (typeof l === 'string' ? l : l?.title || l?.name || ''))
+        .map((l: any) => (typeof l === 'string' ? l : l?.title || l?.name || l?.slug || ''))
         .map((s: string) => normalizeKey(s))
         .filter(Boolean)
     )
   );
 
-  // Find the contact
-  const contact = await prisma.contact.findFirst({
+  // Find the contact. Try by conversationId first; fall back to chatwootContactId
+  // (the contact may have been imported via sync without a conversation linked,
+  // or the conversation may have been replaced by a newer one).
+  const senderContactId =
+    event.conversation.contact_id ||
+    (event.conversation as any).meta?.sender?.id ||
+    null;
+
+  let contact = await prisma.contact.findFirst({
     where: {
       accountId,
       chatwootConversationId: event.conversation.id,
     },
   });
 
+  if (!contact && senderContactId) {
+    contact = await prisma.contact.findFirst({
+      where: {
+        accountId,
+        chatwootContactId: Number(senderContactId),
+      },
+    });
+
+    // Backfill the conversation id so future webhooks resolve faster.
+    if (contact && contact.chatwootConversationId !== event.conversation.id) {
+      try {
+        await prisma.contact.update({
+          where: { id: contact.id },
+          data: { chatwootConversationId: event.conversation.id },
+        });
+      } catch (err) {
+        logger.warn('Failed to backfill chatwootConversationId', { contactId: contact.id, err });
+      }
+    }
+  }
+
+  // If still not found, auto-provision from the conversation sender so future
+  // label changes (like the n8n "em-atendimento" move) take effect immediately.
+  if (!contact && senderContactId) {
+    try {
+      const sender = (event.conversation as any).meta?.sender;
+      const newId = await chatwootService.findOrCreateContactFromChatwoot(
+        accountId,
+        Number(senderContactId),
+        event.conversation.id,
+        {
+          name: sender?.name,
+          phone_number: sender?.phone_number,
+          email: sender?.email,
+        }
+      );
+      contact = await prisma.contact.findUnique({ where: { id: newId } });
+      logger.info('Auto-provisioned contact from conversation_updated webhook', {
+        contactId: newId,
+        conversationId: event.conversation.id,
+      });
+    } catch (err) {
+      logger.error('Failed to auto-provision contact from webhook', { err });
+    }
+  }
+
   if (!contact) {
-    logger.debug('Contact not found for conversation update', {
+    logger.warn('Contact not found for conversation update (no match by conversation or contact id)', {
       conversationId: event.conversation.id,
+      senderContactId,
       incomingKeys,
     });
     return;
